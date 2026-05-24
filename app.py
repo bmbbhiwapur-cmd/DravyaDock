@@ -5,7 +5,7 @@ from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
 import base64
 import py3Dmol
-from st_py3dmol import show_struct
+from stmol import showmol
 from Bio.PDB import PDBParser
 
 # 1. Page Configuration & Professional Branding
@@ -230,7 +230,7 @@ with col_lig_2:
         viewer.addModel(pdb_block, 'pdb')
         viewer.setStyle({'stick': {'colorscheme': 'cyanCarbon'}})
         viewer.zoomTo()
-        show_struct(viewer, height=320)
+        showmol(viewer, height=320, width=450)
 
 st.markdown("---")
 
@@ -260,9 +260,8 @@ with col_prot_1:
 
 with col_prot_2:
     st.subheader("🌐 Target Receptor Macromolecular 3D View")
-    # Placeholder visual container representing the structural protein receptor file geometry
-    # In full app build, pass the downloaded PDB code directly to py3Dmol
+    # Fetch PDB directly and render it
     viewer_p = py3Dmol.view(width=500, height=350, query=f"pdb:{active_row['PDB ID']}")
     viewer_p.setStyle({'cartoon': {'color': 'spectrum'}})
     viewer_p.zoomTo()
-    show_struct(viewer_p, height=350)
+    showmol(viewer_p, height=350, width=500)
