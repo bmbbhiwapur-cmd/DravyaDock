@@ -1,7 +1,0 @@
-streamlit
-pandas
-openpyxl
-rdkit-pypi
-biopython
-st-py3dmol
-numpy
