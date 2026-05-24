@@ -1,7 +1,7 @@
-streamlit==1.35.0
-pandas==2.2.2
-openpyxl==3.1.2
-rdkit==2023.09.5
-biopython==1.83
-st-py3dmol==0.0.1
-numpy==1.26.4
+streamlit
+pandas
+openpyxl
+rdkit-pypi
+biopython
+st-py3dmol
+numpy
