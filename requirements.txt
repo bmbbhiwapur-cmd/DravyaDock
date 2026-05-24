@@ -5,4 +5,6 @@ rdkit
 biopython
 py3Dmol
 stmol
+ipywidgets
+ipython_genutils
 numpy
