@@ -1,10 +1,5 @@
 streamlit
-pandas
-openpyxl
-rdkit
-biopython
-py3Dmol
-stmol
-ipywidgets
-ipython_genutils
 numpy
+pandas
+matplotlib
+rdkit==2023.09.5
