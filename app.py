@@ -54,12 +54,14 @@ def initialize_session_states():
         "serialized_ligand_block": None,
         "ligand_summary_text": "",
         "smiles_cache": "",
+        "ligand_iupac": "Pending...",
         "baseline_affinity": None,
         "redesign_baseline_affinity": None,
         "rd_library": None,
         "selected_variant_id": None,
         "style_mode": "cartoon",
-        "surf_toggle": False
+        "surf_toggle": False,
+        "ayur_row": {}
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -77,7 +79,8 @@ def safe_rerun():
 @st.cache_data
 def load_ayurvedic_db():
     hardcoded_data = [
-        {"Master ID": "M-001", "Herb / Tree Name": "Tulsi", "Scientific Name": "Ocimum sanctum", "Family": "Lamiaceae", "Phytochemical": "Eugenol", "Canonical SMILES": "COC1=C(O)C=CC(CC=C)=C1", "Medicinal Activity": "Antimicrobial / Antiviral", "Target Protein / Receptor Name": "Secreted Aspartyl Proteinase 1", "PDB ID": "1ZAP", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "तुलसी कटुका तिक्ता हृद्या वृष्या दाहपित्तकृत्। दीपना कुष्ठकृच्छ्रघ्न पार्श्वरुक् कफवातजित्॥", "Roman Transliteration": "tulasī kaṭukā tiktā hṛdyā vṛṣyā dāhapittakṛt | dīpanā kuṣṭhakṛcchraghna pārśvaruk kaphavātajit ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu, Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Krimighna (Antimicrobial), Jvaraghna"},
+        {"Master ID": "M-001", "Herb / Tree Name": "Tulsi", "Scientific Name": "Ocimum sanctum", "Family": "Lamiaceae", "Phytochemical": "Eugenol", "Canonical SMILES": "COC1=C(O)C=CC(CC=C)=C1", "Medicinal Activity": "Antimicrobial", "Target Protein / Receptor Name": "Secreted Aspartyl Proteinase 1", "PDB ID": "1ZAP", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "तुलसी कटुका तिक्ता हृद्या वृष्या दाहपित्तकृत्। दीपना कुष्ठकृच्छ्रघ्न पार्श्वरुक् कफवातजित्॥", "Roman Transliteration": "tulasī kaṭukā tiktā hṛdyā vṛṣyā dāhapittakṛt | dīpanā kuṣṭhakṛcchraghna pārśvaruk kaphavātajit ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu, Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Krimighna (Antimicrobial), Jvaraghna"},
+        {"Master ID": "M-001B", "Herb / Tree Name": "Tulsi", "Scientific Name": "Ocimum sanctum", "Family": "Lamiaceae", "Phytochemical": "Ursolic Acid", "Canonical SMILES": "CC1CCC2(CCC3(C(=CCC4C3(CCC5C4(CCC(C5(C)C)O)C)C)C2C1C)C)C(=O)O", "Medicinal Activity": "Anti-inflammatory", "Target Protein / Receptor Name": "Cyclooxygenase-2 (COX-2)", "PDB ID": "5KIR", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "तुलसी कटुका तिक्ता हृद्या वृष्या दाहपित्तकृत्। दीपना कुष्ठकृच्छ्रघ्न पार्श्वरुक् कफवातजित्॥", "Roman Transliteration": "tulasī kaṭukā tiktā hṛdyā vṛṣyā dāhapittakṛt | dīpanā kuṣṭhakṛcchraghna pārśvaruk kaphavātajit ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu, Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Krimighna (Antimicrobial), Jvaraghna"},
         {"Master ID": "M-002", "Herb / Tree Name": "Haldi (Turmeric)", "Scientific Name": "Curcuma longa", "Family": "Zingiberaceae", "Phytochemical": "Curcumin", "Canonical SMILES": "COC1=CC(=CC=C1O)/C=C/C(=O)CC(=O)/C=C/C2=CC(=C(C=C2)O)OC", "Medicinal Activity": "Anti-inflammatory / Anticancer", "Target Protein / Receptor Name": "Cyclooxygenase-2 (COX-2)", "PDB ID": "5KIR", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "हरिद्रा कटुका तिक्ता रूक्षोष्णा कफपित्तनुत्। वर्ण्य त्वग्दोषमेहास्रशोथपाण्डुव्रणापहा॥", "Roman Transliteration": "haridrā kaṭukā tiktā rūkṣoṣṇā kaphapittanut | varṇya tvagdoṣamehāsraśothapāṇḍuvraṇāpahā ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta, Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Vishaghna, Vranaropana, Mehaghna"},
         {"Master ID": "M-003", "Herb / Tree Name": "Ashwagandha", "Scientific Name": "Withania somnifera", "Family": "Solanaceae", "Phytochemical": "Withaferin A", "Canonical SMILES": "CC1=C(C(=O)OC1C2C(CC3C2(CCC4C3CC(C5(C4(C=CC(=O)C5(C)O)C)O)O)C)O)C", "Medicinal Activity": "Neuroprotective / Anticancer", "Target Protein / Receptor Name": "NF-kappa B Essential Modulator (NEMO)", "PDB ID": "3BRV", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "अश्वगन्धाऽनिलश्लेष्मश्वित्रशोथक्षयापहा। बल्या रसायनी तिक्ता कषायोष्णाऽतिशुक्रला॥", "Roman Transliteration": "aśvagandhā'nilaśleṣmaśvitraśothakṣayāpahā | balyā rasāyanī tiktā kaṣāyoṣṇā'tiśukralā ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta, Katu, Madhura; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Rasayana, Balya, Vatahara"},
         {"Master ID": "M-004", "Herb / Tree Name": "Amla", "Scientific Name": "Phyllanthus emblica", "Family": "Phyllanthaceae", "Phytochemical": "Gallic Acid", "Canonical SMILES": "C1=C(C=C(C(=C1O)O)O)C(=O)O", "Medicinal Activity": "Antioxidant / Antidiabetic", "Target Protein / Receptor Name": "Aldose Reductase", "PDB ID": "1US0", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "आमलकं कषायाम्लं मधुरं शिशिरं लघु। दाहपित्तवमीमेहशोथघ्नं रसायनम्॥", "Roman Transliteration": "āmalakaṃ kaṣāyāmlaṃ madhuraṃ śiśiraṃ laghu | dāhapittavamīmehaśothaghnaṃ rasāyanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Amla Pradhana Pancharasa; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Rasayana, Pittahara, Pramehaghna"},
@@ -103,6 +106,16 @@ def fetch_pdb_from_rcsb(pdb_id):
         return True, local_pdb
     except Exception:
         return False, f"Could not find or download PDB ID '{pdb_id.upper()}'."
+
+def get_iupac_name(smiles):
+    try:
+        encoded_smiles = urllib.parse.quote(smiles, safe='')
+        url = f"https://cactus.nci.nih.gov/chemical/structure/{encoded_smiles}/iupac_name"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=3) as response:
+            return response.read().decode('utf-8')
+    except Exception:
+        return "IUPAC translation unavailable"
 
 def extract_pdb_metadata(file_path, pdb_id="Custom"):
     meta = {
@@ -446,16 +459,6 @@ def run_cleaving_engine(parent_smiles, target_atom_idx, mechanism_mode):
         })
     return derived_library
 
-def get_iupac_name(smiles):
-    try:
-        encoded_smiles = urllib.parse.quote(smiles, safe='')
-        url = f"https://cactus.nci.nih.gov/chemical/structure/{encoded_smiles}/iupac_name"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=3) as response:
-            return response.read().decode('utf-8')
-    except Exception:
-        return "IUPAC translation unavailable (Network Timeout)"
-
 def calculate_advanced_adme(smiles):
     default_adme = {
         "MW": 0.0, "LogP": 0.0, "HBD": 0, "HBA": 0, "TPSA": 0.0, "Violations": 0,
@@ -595,13 +598,12 @@ def render_advanced_modeling_blueprint(receptor_data, ligand_data, mode="cartoon
     """
     components.html(html_content, height=510)
 
-
 def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, shift_msg, f_img, v_2d, p_2d, 
                                     smiles_cache, baseline_affinity, grid_params, df_results, 
                                     orig_ints, new_ints, 
                                     receptor_data, orig_ligand_pose_data, redesign_ligand_pose_data, 
                                     selected_pose_orig, selected_pose_new, style_mode, show_surface,
-                                    master_verdict, df_comparison_html):
+                                    master_verdict, df_comparison_html, ayur_row):
     
     if df_results is not None and not df_results.empty:
         res_html = '<table class="dataframe table"><thead><tr>'
@@ -668,7 +670,7 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
     <html>
     <head>
         <meta charset="utf-8">
-        <title>InSilico BioSphere Complete Report</title>
+        <title>Dravyaguna Analysis and Redesign Final Report</title>
         <style>
             body {{ font-family: 'Segoe UI', Arial, sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 0; background-color: #f9f9fb; }}
             .header-banner {{ background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 25px; border-bottom: 5px solid #00c6ff; text-align: center; position: relative; }}
@@ -696,11 +698,23 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
     <body>
         <div class="header-banner">
             <span class="copyright-header">copyright@sarang dhote</span>
-            <h1>🔬 InSilico BioSphere Complete Execution Report</h1>
+            <h1>🌿 Dravyaguna Analysis and Redesign Final Report</h1>
             <p>Department of Chemistry, Shivaji Science College, Nagpur, India</p>
         </div>
         
         <div class="container">
+            <h1 style="text-align: center; color: #14532d; font-size: 32px; border-bottom: none; margin-bottom: 20px;">{ayur_row.get('Herb / Tree Name', 'Ayurvedic Herb')}</h1>
+            
+            <div style="background-color:#f0fdf4; border-left:6px solid #16a34a; padding:20px; border-radius:8px; margin-bottom:30px; color: #1e293b; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                <h3 style="color:#14532d; margin-top:0;">🌿 Botanical Identity: {ayur_row.get('Herb / Tree Name', '')} (<i>{ayur_row.get('Scientific Name', '')}</i>)</h3>
+                <p><b>Family:</b> {ayur_row.get('Family', '')} | <b>Active Phytochemical:</b> {ayur_row.get('Phytochemical', '')}</p>
+                <p><b>Medicinal Activity:</b> {ayur_row.get('Medicinal Activity', '')} | <b>Protein Target:</b> {ayur_row.get('Target Protein / Receptor Name', '')} (PDB: {ayur_row.get('PDB ID', '')})</p>
+                <hr style="border: 0; height: 1px; background: #bbf7d0; margin: 15px 0;">
+                <p style="font-size:16px; color:#064e3b; font-style:italic;"><b>Sanskrit Shloka:</b> {ayur_row.get('Sanskrit Shloka (Bhavaprakasha Nighantu)', '')}</p>
+                <p style="font-size:13px; color:#0f766e;"><b>Transliteration:</b> {ayur_row.get('Roman Transliteration', '')}</p>
+                <p><b>Dravyaguna Profile:</b> {ayur_row.get('Dravyaguna Profile (Rasa/Virya/Vipaka)', '')} | <b>Classical Action:</b> {ayur_row.get('Classical Karma (Action)', '')}</p>
+            </div>
+
             <h2>1. Baseline Docking Configuration & Target Matrix</h2>
             <div class="meta-grid">
                 <div class="meta-item"><strong>Target Protein Name:</strong> {meta['name']}</div>
@@ -733,7 +747,6 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
             
             <script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.0.4/3Dmol-min.js"></script>
             <script>
-                // Viewer 1 (Original)
                 let viewer1 = $3Dmol.createViewer(document.getElementById('container-3d-orig'), {{backgroundColor: '#ffffff'}});
                 let rec_data = `{safe_rec}`;
                 let lig_data_orig = `{safe_lig_orig}`;
@@ -750,7 +763,6 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
                 viewer1.zoomTo(); 
                 viewer1.render();
 
-                // Viewer 2 (Redesign)
                 let viewer2 = $3Dmol.createViewer(document.getElementById('container-3d-redesign'), {{backgroundColor: '#ffffff'}});
                 let lig_data_redesign = `{safe_lig_redesign}`;
                 if (rec_data.trim().length > 0) {{
@@ -834,10 +846,10 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
         </div>
         <footer>
             <p>Report compiled successfully. Ready for manuscript citation.</p>
-            <p>InSilico BioSphere: An Integrated Platform for Automated Molecular Docking.</p>
-            <p>Developed by Dr. Sarang S. Dhote, Assistant Professor, Department of Chemistry,<br>
-            Shivaji Science College, Nagpur, India.<br>
-            Email: contact - sarangresearch@gmail.com</p>
+            <p><b>DravyaDock: Computational Ayurvedic Molecular Docking Platform</b></p>
+            <p>Developed by Mr. Sarang S. Dhote, Assistant Professor, Department of Chemistry,<br>
+            Shivaji Science College, Nagpur, Maharashtra, India.<br>
+            Email: sarangresearch@gmail.com</p>
         </footer>
     </body>
     </html>
@@ -847,9 +859,17 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
 # 6. APPLICATION DASHBOARD WORKSPACE (SINGLE PAGE FLOW)
 # =====================================================================
 
-st.set_page_config(page_title="In Silico BioSphere Hub", layout="wide")
-st.title("🔬 InSilico BioSphere - Unified Drug Design Engine")
-st.markdown("**Developed by: Dr. Sarang S. Dhote, Assistant Professor, Department of Chemistry, Shivaji Science College, Nagpur, India | Tech Logic Core Systems (TLCS)**")
+st.set_page_config(page_title="DravyaDock Hub", layout="wide")
+st.title("🌿 DravyaDock (द्रव्यDock)")
+st.markdown("### Computational Ayurvedic Molecular Docking Platform")
+st.markdown("> *DravyaDock bridges traditional Ayurvedic pharmacology (Dravyaguna Vidya) from the Bhavaprakasha Nighantu with modern translational structural bioinformatics and structure-based drug discovery pipelines.*")
+st.markdown("""
+**🔬 Research Credits & Institutional Affiliation**<br>
+**Principal Investigator:** Mr. Sarang Dhote (Assistant Professor)<br>
+**Department:** Department of Chemistry<br>
+**Institution:** Shivaji Science College, Nagpur, Maharashtra, India<br>
+**Research Correspondence:** sarangresearch@gmail.com
+""", unsafe_allow_html=True)
 
 # Master Reset
 if st.button("🔄 Reset Entire Environment", type="secondary", use_container_width=True):
@@ -873,36 +893,26 @@ with col_params:
     st.subheader("1. Ayurvedic Database Integration")
     df_ayur = load_ayurvedic_db()
     
-    search_mode = st.radio("Select Database Search Method:", ["Search by Herb / Tree Name", "Search by Medicinal Activity"])
+    # Selection Logic handling Multiple Properties per Tree
+    herb_list = sorted(df_ayur['Herb / Tree Name'].dropna().unique())
+    selected_herb = st.selectbox("Select Ayurvedic Plant / Herb:", herb_list)
     
-    if search_mode == "Search by Herb / Tree Name":
-        herb_list = sorted(df_ayur['Herb / Tree Name'].dropna().unique())
-        selected_herb = st.selectbox("Select Plant:", herb_list)
-        
-        activities = df_ayur[df_ayur['Herb / Tree Name'] == selected_herb]['Medicinal Activity'].unique()
-        if len(activities) > 1:
-            selected_activity = st.selectbox("Select Target Medicinal Activity:", activities)
-            row = df_ayur[(df_ayur['Herb / Tree Name'] == selected_herb) & (df_ayur['Medicinal Activity'] == selected_activity)].iloc[0]
-        else:
-            row = df_ayur[df_ayur['Herb / Tree Name'] == selected_herb].iloc[0]
-            
-    else: 
-        activity_list = sorted(df_ayur['Medicinal Activity'].dropna().unique())
-        selected_activity = st.selectbox("Select Medicinal Activity:", activity_list)
-        herb_list = sorted(df_ayur[df_ayur['Medicinal Activity'] == selected_activity]['Herb / Tree Name'].dropna().unique())
-        selected_herb = st.selectbox("Select Plant:", herb_list)
-        row = df_ayur[(df_ayur['Herb / Tree Name'] == selected_herb) & (df_ayur['Medicinal Activity'] == selected_activity)].iloc[0]
+    activities = df_ayur[df_ayur['Herb / Tree Name'] == selected_herb]['Medicinal Activity'].unique()
+    selected_activity = st.selectbox("Select Target Medicinal Activity / Property:", activities)
 
-    # Enhanced Highlight Matrix for Ayurvedic Info
+    row = df_ayur[(df_ayur['Herb / Tree Name'] == selected_herb) & (df_ayur['Medicinal Activity'] == selected_activity)].iloc[0]
+    st.session_state.ayur_row = row.to_dict()
+
+    # Enhanced Highlight Matrix for Ayurvedic Info with High Contrast Colors
     st.markdown(f"""
-    <div style="background-color:#f0fdf4; border-left:6px solid #16a34a; padding:15px; border-radius:8px; margin-bottom:20px;">
-        <h3 style="color:#166534; margin-top:0;">🌿 Botanical Identity: {row['Herb / Tree Name']} (<i>{row['Scientific Name']}</i>)</h3>
-        <p><b>Family:</b> {row['Family']} | <b>Active Phytochemical:</b> {row['Phytochemical']}</p>
-        <p><b>Medicinal Activity:</b> {row['Medicinal Activity']} | <b>Protein Target:</b> {row['Target Protein / Receptor Name']} (PDB: {row['PDB ID']})</p>
-        <hr style="border: 0; height: 1px; background: #bbf7d0; margin: 10px 0;">
-        <p style="font-size:16px; color:#065f46; font-style:italic;"><b>Sanskrit Shloka:</b> {row['Sanskrit Shloka (Bhavaprakasha Nighantu)']}</p>
-        <p style="font-size:13px; color:#047857;"><b>Transliteration:</b> {row['Roman Transliteration']}</p>
-        <p><b>Dravyaguna Profile:</b> {row['Dravyaguna Profile (Rasa/Virya/Vipaka)']} | <b>Classical Action:</b> {row['Classical Karma (Action)']}</p>
+    <div style="background-color:#f8fafc; border-left:6px solid #16a34a; padding:15px; border-radius:8px; margin-bottom:20px; color: #1e293b; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h3 style="color:#14532d; margin-top:0;">🌿 Botanical Identity: {row['Herb / Tree Name']} (<i>{row['Scientific Name']}</i>)</h3>
+        <p style="color:#334155; margin-bottom:4px;"><b>Family:</b> {row['Family']} | <b>Active Phytochemical:</b> {row['Phytochemical']}</p>
+        <p style="color:#334155; margin-top:0;"><b>Medicinal Activity:</b> {row['Medicinal Activity']} | <b>Protein Target:</b> {row['Target Protein / Receptor Name']} (PDB: {row['PDB ID']})</p>
+        <hr style="border: 0; height: 1px; background: #cbd5e1; margin: 12px 0;">
+        <p style="font-size:16px; color:#064e3b; font-style:italic; margin-bottom:4px;"><b>Sanskrit Shloka:</b> {row['Sanskrit Shloka (Bhavaprakasha Nighantu)']}</p>
+        <p style="font-size:13px; color:#0f766e; margin-top:0;"><b>Transliteration:</b> {row['Roman Transliteration']}</p>
+        <p style="color:#334155; margin-bottom:0; padding-top:8px; border-top:1px dashed #cbd5e1;"><b>Dravyaguna Profile:</b> {row['Dravyaguna Profile (Rasa/Virya/Vipaka)']} | <b>Classical Action:</b> {row['Classical Karma (Action)']}</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -927,8 +937,13 @@ with col_params:
             if ok:
                 st.session_state.ligand_ready = True
                 st.session_state.smiles_cache = smiles_str
+                
+                # Fetch IUPAC directly
+                iupac = get_iupac_name(smiles_str)
+                st.session_state.ligand_iupac = iupac
+                
                 with open("ligand.pdbqt", "r") as f: st.session_state.serialized_ligand_block = f.read()
-                st.session_state.ligand_summary_text = f"**Phytochemical:** {row['Phytochemical']} | **Target Activity:** {row['Medicinal Activity']}"
+                st.session_state.ligand_summary_text = f"**Phytochemical:** {row['Phytochemical']} <br> **IUPAC Nomenclature:** {iupac} <br> **Target Activity:** {row['Medicinal Activity']}"
             else:
                 st.error(f"SMILES Error: {msg}")
 
@@ -937,7 +952,7 @@ with col_params:
                 trigger_rerun = True
 
     if st.session_state.target_ready and os.path.exists("ligand.pdbqt"): st.session_state.ligand_ready = True
-    if st.session_state.ligand_ready: st.markdown(f"> **Ligand Metric Summary Profile:** \n> {st.session_state.ligand_summary_text}")
+    if st.session_state.ligand_ready: st.markdown(f"> **Ligand Metric Summary Profile:** \n> <br>{st.session_state.ligand_summary_text}", unsafe_allow_html=True)
 
     if st.session_state.target_ready and st.session_state.local_target_path:
         bound_ligands_list = parse_bound_ligands(st.session_state.local_target_path)
@@ -1550,20 +1565,21 @@ else:
                 receptor_data = ""
 
             html_report = build_comprehensive_html_report(
-                meta=meta_data, adme_p=adme_p, adme_v=adme_v, variant_row=v_row, iupac=iupac, shift_msg=shift_msg, 
+                meta=meta_data, adme_p=adme_p, adme_v=adme_v, variant_row=v_row, iupac=st.session_state.ligand_iupac, shift_msg=shift_msg, 
                 f_img=ftir_b64, v_2d=v_2d, p_2d=b_img, smiles_cache=st.session_state.smiles_cache, 
                 baseline_affinity=st.session_state.baseline_affinity, grid_params=grid_params, 
                 df_results=df_results, orig_ints=orig_ints, new_ints=new_ints, 
                 receptor_data=receptor_data, orig_ligand_pose_data=orig_pose, redesign_ligand_pose_data=p4_poses[p4_sel_pose], 
                 selected_pose_orig=st.session_state.get('selected_pose_export', 1), selected_pose_new=p4_sel_pose,
                 style_mode=st.session_state.style_mode, show_surface=st.session_state.surf_toggle,
-                master_verdict=master_verdict, df_comparison_html=df_comparison_html
+                master_verdict=master_verdict, df_comparison_html=df_comparison_html,
+                ayur_row=st.session_state.ayur_row
             )
             
             st.download_button(
                 label="📥 Download Consolidated Manuscript Quality HTML Research Report",
                 data=html_report,
-                file_name=f"InSilico_BioSphere_Research_Record_{v_row['Variant ID']}.html",
+                file_name=f"Dravyaguna_Research_Record_{v_row['Variant ID']}.html",
                 mime="text/html",
                 use_container_width=True,
                 key="dl_phase4"
