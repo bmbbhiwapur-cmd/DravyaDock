@@ -1391,7 +1391,6 @@ else:
         
         can_run_p4 = os.path.exists("protein.pdbqt") and os.path.exists("redesign_ligand.pdbqt")
         if st.button("🚀 Initialize Validation Docking Engine", type="primary", disabled=not can_run_p4):
-            # Setup Grid
             if "Blind" in grid_mode:
                 p4_cx, p4_cy, p4_cz, p4_sx, p4_sy, p4_sz = compute_protein_bounding_box("protein.pdbqt")
             else:
@@ -1444,7 +1443,6 @@ else:
         if p4_poses:
             p4_sel_pose = st.selectbox("Select Derivative Binding Pose for Comparison:", options=list(p4_poses.keys()), format_func=lambda x: f"Derivative Pose {x}", key="p4_pose_sel")
             
-            # Extract Affinities
             orig_aff = st.session_state.baseline_affinity
             new_aff_str = get_pose_affinity(st.session_state.redesign_docking_results_raw, p4_sel_pose)
             
@@ -1453,7 +1451,6 @@ else:
                 st.session_state.redesign_baseline_affinity = new_aff
             except: new_aff = 0.0
 
-            # Compare Data
             orig_pose = split_docking_poses("docking_poses.pdbqt").get(st.session_state.get('selected_pose_export', 1), "") if os.path.exists("docking_poses.pdbqt") else ""
             orig_ints = compute_spatial_interactions("protein.pdbqt", orig_pose) if orig_pose else []
             new_ints = compute_spatial_interactions("protein.pdbqt", p4_poses[p4_sel_pose])
@@ -1463,7 +1460,6 @@ else:
             o_bonds = ", ".join(sorted(list(set([i["Interaction Type"] for i in orig_ints])))) if orig_ints else "None"
             n_bonds = ", ".join(sorted(list(set([i["Interaction Type"] for i in new_ints])))) if new_ints else "None"
 
-            # Render 3D Side-by-Side
             with open("protein.pdbqt", "r") as f: p_data = f.read()
             
             col_3d_1, col_3d_2 = st.columns(2)
@@ -1487,10 +1483,9 @@ else:
                     if "kcal/mol" in str(val):
                         v = float(val.split()[0])
                         orig_v = float(orig_aff) if orig_aff else 0.0
-                        if v < orig_v: return 'color: #10b981; font-weight: bold;' # Improved (More negative)
-                        elif v > orig_v: return 'color: #ef4444; font-weight: bold;' # Worsened
+                        if v < orig_v: return 'color: #10b981; font-weight: bold;'
+                        elif v > orig_v: return 'color: #ef4444; font-weight: bold;'
                     else:
-                        # For residue text strings, use a nice golden yellow for visibility
                         return 'color: #d97706; font-weight: bold;'
                 except: pass
                 return 'color: black'
@@ -1501,7 +1496,6 @@ else:
                 styled_comp = df_comp.style.applymap(color_comparison, subset=['Optimized Derivative'])
             st.dataframe(styled_comp, hide_index=True, use_container_width=True)
             
-            # --- MASTER VERDICT GENERATOR ---
             delta_aff = round(new_aff - float(orig_aff), 2) if orig_aff else 0.0
             
             master_verdict = ""
@@ -1537,7 +1531,6 @@ else:
                 'exh': st.session_state.exhaustiveness
             }
             
-            # HTML generation for the comparative table (with CSS yellow text color)
             df_comparison_html = '<table class="dataframe table"><thead><tr><th>Metric</th><th>Original Lead</th><th>Optimized Derivative</th></tr></thead><tbody>'
             for _, r in df_comp.iterrows():
                 val = r['Optimized Derivative']
@@ -1550,7 +1543,7 @@ else:
                         elif v > orig_v: style = 'style="color: #ef4444; font-weight: bold;"'
                     except: pass
                 else:
-                    style = 'style="color: #d97706; font-weight: bold;"' # Golden Yellow CSS for non-numeric text
+                    style = 'style="color: #d97706; font-weight: bold;"'
                 df_comparison_html += f"<tr><td>{r['Metric']}</td><td>{r['Original Lead']}</td><td {style}>{val}</td></tr>"
             df_comparison_html += '</tbody></table>'
 
@@ -1582,6 +1575,5 @@ else:
                 key="dl_phase4"
             )
 
-# Execute Rerun at the absolute bottom of the script to prevent rendering glitches
 if trigger_rerun:
     safe_rerun()
