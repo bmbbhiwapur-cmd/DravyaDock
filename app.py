@@ -6,6 +6,7 @@ import urllib.request
 import urllib.parse
 import json
 import re
+import glob
 import numpy as np
 import pandas as pd
 import streamlit.components.v1 as components
@@ -40,15 +41,27 @@ ensure_linux_vina_exists()
 
 def initialize_session_states():
     defaults = {
-        "protein_name": "Unknown Protein", "cx": 0.0, "cy": 0.0, "cz": 0.0,
-        "sx": 20, "sy": 20, "sz": 20, "exhaustiveness": 8,
-        "target_ready": False, "ligand_ready": False, "local_target_path": None,
-        "pdb_id_display": "Custom", "docking_results_raw": None,
-        "redesign_docking_results_raw": None, "serialized_ligand_block": None,
-        "ligand_summary_text": "", "smiles_cache": "", "ligand_iupac": "Pending...",
-        "baseline_affinity": None, "redesign_baseline_affinity": None,
-        "rd_library": None, "selected_variant_id": None, "style_mode": "cartoon",
-        "surf_toggle": False, "ayur_row": {}
+        "protein_name": "Unknown Protein",
+        "cx": 0.0, "cy": 0.0, "cz": 0.0,
+        "sx": 20, "sy": 20, "sz": 20,
+        "exhaustiveness": 8,
+        "target_ready": False,
+        "ligand_ready": False,
+        "local_target_path": None,
+        "pdb_id_display": "Custom",
+        "docking_results_raw": None,
+        "redesign_docking_results_raw": None,
+        "serialized_ligand_block": None,
+        "ligand_summary_text": "",
+        "smiles_cache": "",
+        "ligand_iupac": "Pending...",
+        "baseline_affinity": None,
+        "redesign_baseline_affinity": None,
+        "rd_library": None,
+        "selected_variant_id": None,
+        "style_mode": "cartoon",
+        "surf_toggle": False,
+        "ayur_row": {}
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -62,79 +75,32 @@ def safe_rerun():
     except AttributeError:
         st.experimental_rerun()
 
-# --- AYURVEDIC DATABASE LOADER (50 ENTRIES WITH MULTIPLE PROPERTIES) ---
+# --- AYURVEDIC DATABASE LOADER (STRICTLY FOLLOWS YOUR EXCEL/CSV) ---
 @st.cache_data
 def load_ayurvedic_db():
-    hardcoded_data = [
-        {"Master ID": "M-001", "Herb / Tree Name": "Tulsi", "Scientific Name": "Ocimum sanctum", "Family": "Lamiaceae", "Phytochemical": "Eugenol", "Canonical SMILES": "COC1=C(O)C=CC(CC=C)=C1", "Medicinal Activity": "Antimicrobial", "Target Protein / Receptor Name": "Secreted Aspartyl Proteinase 1", "PDB ID": "1ZAP", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "तुलसी कटुका तिक्ता हृद्या वृष्या दाहपित्तकृत्। दीपना कुष्ठकृच्छ्रघ्न पार्श्वरुक् कफवातजित्॥", "Roman Transliteration": "tulasī kaṭukā tiktā hṛdyā vṛṣyā dāhapittakṛt", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu, Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Krimighna (Antimicrobial)"},
-        {"Master ID": "M-002", "Herb / Tree Name": "Tulsi", "Scientific Name": "Ocimum sanctum", "Family": "Lamiaceae", "Phytochemical": "Ursolic Acid", "Canonical SMILES": "CC1CCC2(CCC3(C(=CCC4C3(CCC5C4(CCC(C5(C)C)O)C)C)C2C1C)C)C(=O)O", "Medicinal Activity": "Anti-inflammatory", "Target Protein / Receptor Name": "Cyclooxygenase-2 (COX-2)", "PDB ID": "5KIR", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "तुलसी कटुका तिक्ता हृद्या वृष्या दाहपित्तकृत्। दीपना कुष्ठकृच्छ्रघ्न पार्श्वरुक् कफवातजित्॥", "Roman Transliteration": "tulasī kaṭukā tiktā hṛdyā vṛṣyā dāhapittakṛt", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu, Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Shothahara"},
-        {"Master ID": "M-003", "Herb / Tree Name": "Haldi", "Scientific Name": "Curcuma longa", "Family": "Zingiberaceae", "Phytochemical": "Curcumin", "Canonical SMILES": "COC1=CC(=CC=C1O)/C=C/C(=O)CC(=O)/C=C/C2=CC(=C(C=C2)O)OC", "Medicinal Activity": "Anti-inflammatory", "Target Protein / Receptor Name": "Cyclooxygenase-2 (COX-2)", "PDB ID": "5KIR", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "हरिद्रा कटुका तिक्ता रूक्षोष्णा कफपित्तनुत्।", "Roman Transliteration": "haridrā kaṭukā tiktā rūkṣoṣṇā kaphapittanut", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta, Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Vranaropana"},
-        {"Master ID": "M-004", "Herb / Tree Name": "Haldi", "Scientific Name": "Curcuma longa", "Family": "Zingiberaceae", "Phytochemical": "Demethoxycurcumin", "Canonical SMILES": "COC1=CC(=CC=C1O)/C=C/C(=O)CC(=O)/C=C/C2=CC=C(C=C2)O", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "NF-kappa B Essential Modulator", "PDB ID": "3BRV", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "हरिद्रा कटुका तिक्ता रूक्षोष्णा कफपित्तनुत्।", "Roman Transliteration": "haridrā kaṭukā tiktā rūkṣoṣṇā kaphapittanut", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta, Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Vishaghna"},
-        {"Master ID": "M-005", "Herb / Tree Name": "Ashwagandha", "Scientific Name": "Withania somnifera", "Family": "Solanaceae", "Phytochemical": "Withaferin A", "Canonical SMILES": "CC1=C(C(=O)OC1C2C(CC3C2(CCC4C3CC(C5(C4(C=CC(=O)C5(C)O)C)O)O)C)O)C", "Medicinal Activity": "Neuroprotective", "Target Protein / Receptor Name": "Acetylcholinesterase", "PDB ID": "1EVE", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "अश्वगन्धाऽनिलश्लेष्मश्वित्रशोथक्षयापहा।", "Roman Transliteration": "aśvagandhā'nilaśleṣmaśvitraśothakṣayāpahā", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta, Katu, Madhura; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Rasayana"},
-        {"Master ID": "M-006", "Herb / Tree Name": "Amla", "Scientific Name": "Phyllanthus emblica", "Family": "Phyllanthaceae", "Phytochemical": "Gallic Acid", "Canonical SMILES": "C1=C(C=C(C(=C1O)O)O)C(=O)O", "Medicinal Activity": "Antioxidant", "Target Protein / Receptor Name": "Human Peroxiredoxin 5", "PDB ID": "1HD2", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "वयःस्थापनां धात्रीफलमम्लं रसे स्मृतम्। परं कफहरं वृष्यं चक्षुष्यं च रसायनम्॥", "Roman Transliteration": "vayaḥsthāpanāṃ dhātrīphalamamlaṃ rase smṛtam | paraṃ kaphaharaṃ vṛṣyaṃ cakṣuṣyaṃ ca rasāyanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Amla Madhura Tikta Kasaya Katu; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Rasayana Vayasthapana (Anti-aging) Chakshushya"},
-        {"Master ID": "M-007", "Herb / Tree Name": "Amla", "Scientific Name": "Phyllanthus emblica", "Family": "Phyllanthaceae", "Phytochemical": "Quercetin", "Canonical SMILES": "O=C1C(O)=C(C2=CC=C(O)C=C2)OC3=CC(O)=CC(O)=C13", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "Alpha-glucosidase", "PDB ID": "3TOP", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "आमलकं कषायाम्लं मधुरं शिशिरं लघु।", "Roman Transliteration": "āmalakaṃ kaṣāyāmlaṃ madhuraṃ śiśiraṃ laghu", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Amla Pradhana; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Pramehaghna"}
-    ]
+    # Looks for any file matching your database name in the directory
+    csv_files = glob.glob("*Ayurvedic_Phytochemical_Sanskrit*.csv")
+    excel_files = glob.glob("*Ayurvedic_Phytochemical_Sanskrit*.xlsx")
     
-    # Fill remaining entries to 50 total trees for the database
-    extra_trees = [
-        ("Kalmegh", "Andrographis paniculata", "Acanthaceae", "Andrographolide", "Hepatoprotective", "HCV Protease", "3M5O", "Yakrituttejaka"),
-        ("Guggul", "Commiphora mukul", "Burseraceae", "Z-Guggulsterone", "Hypolipidemic", "FXR", "1OSV", "Medohara"),
-        ("Pippali", "Piper longum", "Piperaceae", "Piperine", "Bioenhancer", "CYP 3A4", "1TQN", "Rasayana"),
-        ("Sarpagandha", "Rauvolfia serpentina", "Apocynaceae", "Reserpine", "Antihypertensive", "VMAT2", "2KBI", "Nidrajanana"),
-        ("Ginger", "Zingiber officinale", "Zingiberaceae", "6-Gingerol", "Antiemetic", "5-HT3 Receptor", "6Y59", "Deepana"),
-        ("Garlic", "Allium sativum", "Amaryllidaceae", "Allicin", "Cardioprotective", "HMG-CoA Reductase", "1HW9", "Hridya"),
-        ("Brahmi", "Bacopa monnieri", "Plantaginaceae", "Bacoside A", "Nootropic", "GABA Receptor", "4COF", "Medhya"),
-        ("Guduchi", "Tinospora cordifolia", "Menispermaceae", "Tinosporin", "Immunomodulatory", "MIF", "3E8O", "Jvaraghna"),
-        ("Shatavari", "Asparagus racemosus", "Asparagaceae", "Shatavarin IV", "Galactagogue", "Prolactin Receptor", "3O2V", "Vrishya"),
-        ("Haritaki", "Terminalia chebula", "Combretaceae", "Chebulinic acid", "Laxative", "5-HT4 Receptor", "6HJP", "Anulomana"),
-        ("Bibhitaki", "Terminalia bellirica", "Combretaceae", "Gallic Acid", "Antitussive", "Histamine H1", "3RZE", "Kasahara"),
-        ("Arjuna", "Terminalia arjuna", "Combretaceae", "Arjunolic acid", "Cardioprotective", "Beta-1 Adrenergic", "2Y02", "Hridya"),
-        ("Gokshura", "Tribulus terrestris", "Zygophyllaceae", "Protodioscin", "Diuretic", "Carbonic Anhydrase", "1AZM", "Mutrala"),
-        ("Punarnava", "Boerhavia diffusa", "Nyctaginaceae", "Punarnavine", "Anti-edematous", "Renin", "2V0Z", "Shothahara"),
-        ("Vasa", "Adhatoda vasica", "Acanthaceae", "Vasicine", "Bronchodilator", "Phosphodiesterase 4", "1RO6", "Shvasahara"),
-        ("Kantakari", "Solanum virginianum", "Solanaceae", "Solasodine", "Expectorant", "Muscarinic M3", "4DAJ", "Kasahara"),
-        ("Bhringaraj", "Eclipta alba", "Asteraceae", "Wedelolactone", "Hepatoprotective", "Cytochrome P450", "1TQN", "Yakrituttejaka"),
-        ("Manjistha", "Rubia cordifolia", "Rubiaceae", "Purpurin", "Blood Purifier", "Serum Albumin", "1AO6", "Raktashodhaka"),
-        ("Neem", "Azadirachta indica", "Meliaceae", "Nimbin", "Antibacterial", "PBP2a", "1VQQ", "Krimighna"),
-        ("Kutki", "Picrorhiza kurroa", "Plantaginaceae", "Picroside I", "Hepatoprotective", "HBV Protease", "2M5O", "Bhedana"),
-        ("Chitrak", "Plumbago zeylanica", "Plumbaginaceae", "Plumbagin", "Digestive", "Pancreatic Lipase", "1LPB", "Deepana"),
-        ("Daruharidra", "Berberis aristata", "Berberidaceae", "Berberine", "Antimicrobial", "DNA Gyrase", "1KZN", "Krimighna"),
-        ("Musta", "Cyperus rotundus", "Cyperaceae", "Cyperene", "Antispasmodic", "PDE4", "1RO6", "Pachana"),
-        ("Vidanga", "Embelia ribes", "Primulaceae", "Embelin", "Anthelmintic", "Tubulin", "1TUB", "Krimighna"),
-        ("Sariva", "Hemidesmus indicus", "Apocynaceae", "Hemidesmin", "Blood Purifier", "Serum Albumin", "1AO6", "Raktashodhaka"),
-        ("Kumari", "Aloe vera", "Asphodelaceae", "Aloin", "Laxative", "Guanylate Cyclase", "1AW9", "Bhedana"),
-        ("Kapikacchu", "Mucuna pruriens", "Fabaceae", "L-DOPA", "Neuroprotective", "Dopamine D2", "6CM4", "Vrishya"),
-        ("Bakuchi", "Psoralea corylifolia", "Fabaceae", "Psoralen", "Anti-vitiligo", "Tyrosinase", "1WX2", "Kushthaghna"),
-        ("Jyotishmati", "Celastrus paniculatus", "Celastraceae", "Celastrine", "Cognitive", "AChE", "1EVE", "Medhya"),
-        ("Shalaparni", "Desmodium gangeticum", "Fabaceae", "Gangetin", "Anti-inflammatory", "COX-2", "5KIR", "Angamardaprashamana"),
-        ("Prishniparni", "Uraria picta", "Fabaceae", "Urariol", "Fracture Healing", "Osteocalcin", "1Q8H", "Sandhaniya"),
-        ("Brihati", "Solanum indicum", "Solanaceae", "Solasodine", "Expectorant", "M3 Receptor", "4DAJ", "Kasahara"),
-        ("Agnimantha", "Clerodendrum phlomidis", "Lamiaceae", "Pectolinarigenin", "Anti-inflammatory", "Lipoxygenase", "3O8Y", "Shothahara"),
-        ("Shyonaka", "Oroxylum indicum", "Bignoniaceae", "Oroxylin A", "Anticancer", "Topoisomerase II", "1ZXM", "Deepana"),
-        ("Patala", "Stereospermum suaveolens", "Bignoniaceae", "Lapachol", "Wound Healing", "Collagenase", "1CGL", "Vranaropana"),
-        ("Gambhari", "Gmelina arborea", "Lamiaceae", "Gmelinol", "Lactogenic", "Prolactin Receptor", "3O2V", "Stanyajanana"),
-        ("Bilva", "Aegle marmelos", "Rutaceae", "Marmelosin", "Antidiarrheal", "Guanylate Cyclase", "1AW9", "Grahi"),
-        ("Shalmali", "Bombax ceiba", "Malvaceae", "Lupeol", "Astringent", "Trypsin", "1AQ7", "Stambhana"),
-        ("Palasha", "Butea monosperma", "Fabaceae", "Butein", "Anthelmintic", "Beta-Tubulin", "1TUB", "Krimighna"),
-        ("Ashoka", "Saraca asoca", "Fabaceae", "Ketosterol", "Uterine Tonic", "Estrogen Receptor", "1A52", "Garbhashaya Balya"),
-        ("Lodhra", "Symplocos racemosa", "Symplocaceae", "Loturine", "Hemostatic", "Thrombin", "1BBR", "Stambhana"),
-        ("Kutaja", "Holarrhena antidysenterica", "Apocynaceae", "Conessine", "Anti-amoebic", "Cysteine Proteinase", "1F2A", "Atisarahara"),
-        ("Vacha", "Acorus calamus", "Acoraceae", "Asarone", "Nootropic", "GABA Receptor", "4COF", "Medhya")
-    ]
-    
-    current_id = 8
-    for t in extra_trees:
-        hardcoded_data.append({
-            "Master ID": f"M-{current_id:03d}", "Herb / Tree Name": t[0], "Scientific Name": t[1], 
-            "Family": t[2], "Phytochemical": t[3], "Canonical SMILES": "COC1=C(O)C=CC(CC=C)=C1", 
-            "Medicinal Activity": t[4], "Target Protein / Receptor Name": t[5], "PDB ID": t[6], 
-            "Sanskrit Shloka (Bhavaprakasha Nighantu)": f"आयुर्वेदीय श्लोक {t[0]}", 
-            "Roman Transliteration": f"Ayurvedic Shloka for {t[0]}", 
-            "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta; Virya: Ushna", "Classical Karma (Action)": t[7]
-        })
-        current_id += 1
-
-    return pd.DataFrame(hardcoded_data)
+    if csv_files:
+        df = pd.read_csv(csv_files[0])
+    elif excel_files:
+        df = pd.read_excel(excel_files[0])
+    else:
+        # Fallback to general search if exact name is changed
+        csv_files = glob.glob("*.csv")
+        if csv_files:
+            df = pd.read_csv(csv_files[0])
+        else:
+            st.error("🚨 Master Database File Not Found! Please ensure 'Ayurvedic_Phytochemical_Sanskrit_Master_Database_V2.csv' is uploaded to the same directory as this app.")
+            return pd.DataFrame()
+            
+    # Clean string columns to prevent trailing space errors
+    for col in df.columns:
+        if df[col].dtype == object:
+            df[col] = df[col].astype(str).str.strip()
+            
+    return df
 
 # =====================================================================
 # 2. BIOINFORMATICS STRUCTURAL CONVERTERS & PARSERS
@@ -142,10 +108,12 @@ def load_ayurvedic_db():
 
 def fetch_pdb_from_rcsb(pdb_id):
     try:
-        if not pdb_id or pd.isna(pdb_id): return False, "Missing or Invalid PDB ID in Database."
+        if not pdb_id or pd.isna(pdb_id) or str(pdb_id).lower() == 'nan': 
+            return False, "Missing or Invalid PDB ID in Database."
         pdb_id = str(pdb_id).strip().lower()
-        if pdb_id == "" or pdb_id == "nan": return False, "Missing or Invalid PDB ID in Database."
-        
+        if len(pdb_id) != 4:
+            return False, "PDB ID must be exactly 4 characters."
+            
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
         local_pdb = f"{pdb_id}.pdb"
         urllib.request.urlretrieve(url, local_pdb)
@@ -165,8 +133,8 @@ def get_iupac_name(smiles):
 
 def extract_pdb_metadata(file_path, pdb_id="Custom"):
     meta = {
-        "name": "Unknown Protein", "title": "Uploaded Protein Structure Matrix", 
-        "id": pdb_id.upper() if pdb_id and pdb_id != "Uploaded File" else "Unknown",
+        "name": "Unknown Protein",
+        "title": "Uploaded Protein Structure Matrix", "id": pdb_id.upper() if pdb_id and pdb_id != "Uploaded File" else "Unknown",
         "class": "Unknown Classification", "organism": "Unknown",
         "system": "Unknown Expression System", "method": "X-RAY DIFFRACTION", "res": "N/A"
     }
@@ -252,7 +220,7 @@ def compute_protein_bounding_box(pdbqt_file):
     size = (max_c - min_c) + 15.0
     return center[0], center[1], center[2], size[0], size[1], size[2]
 
-def convert_pdb_to_pdbqt(input_pdb, output_pdbqt="protein.pdbqt", is_ligand=False):
+def convert_pdb_to_pdbqt(input_pdb, output_pdbqt="protein.pdbqt", is_ligand=False, remove_cofactors=True):
     autodock_type_map = {
         "H": "H", "HD": "HD", "HS": "HS", "C": "C", "A": "A", "N": "N", "NA": "NA", 
         "NS": "NS", "O": "O", "OA": "OA", "S": "S", "SA": "SA", "P": "P", "F": "F", 
@@ -268,6 +236,10 @@ def convert_pdb_to_pdbqt(input_pdb, output_pdbqt="protein.pdbqt", is_ligand=Fals
         with open(input_pdb, "r", encoding="utf-8", errors="ignore") as pdb, open(output_pdbqt, "w", encoding="utf-8") as pdbqt:
             if is_ligand: pdbqt.write("ROOT\n")
             for line in pdb:
+                # --- REBUILD MATRIX LOGIC ---
+                if not is_ligand and remove_cofactors and line.startswith("HETATM"):
+                    continue # Skip waters and cofactors
+                    
                 if line.startswith(("ATOM", "HETATM")):
                     record_type = line[:6].strip()
                     try: atom_id = int(line[6:11].strip())
@@ -298,17 +270,15 @@ def convert_smiles_to_pdbqt(smiles_string, output_filename="ligand.pdbqt"):
         if mol is None: return False, "Invalid SMILES."
         mol = Chem.AddHs(mol)
         
-        # 3D Embedding
+        # 3D Coordinate Generation
         params = AllChem.ETKDGv3()
         params.useRandomCoords = True
         params.maxIterations = 1000
         res = AllChem.EmbedMolecule(mol, params)
         if res != 0:
-            res = AllChem.EmbedMolecule(mol, useRandomCoords=True)
-        if res != 0:
-            return False, "RDKit failed to generate 3D coordinates for this specific SMILES."
+            AllChem.EmbedMolecule(mol, useRandomCoords=True)
             
-        # Rigorous UFF / MMFF94 Minimization
+        # UFF / MMFF94 Energy Minimization
         try:
             if AllChem.MMFFHasAllMoleculeParams(mol):
                 AllChem.MMFFOptimizeMolecule(mol, maxIters=500)
@@ -945,70 +915,89 @@ with col_params:
     st.subheader("1. Ayurvedic Database Integration")
     df_ayur = load_ayurvedic_db()
     
-    # Dual Filter Logic 
-    search_mode = st.radio("Select Database Search Method:", ["Search by Herb / Tree Name", "Search by Medicinal Activity"])
-    
-    if search_mode == "Search by Herb / Tree Name":
-        herb_list = sorted(df_ayur['Herb / Tree Name'].dropna().unique())
-        selected_herb = st.selectbox("Select Ayurvedic Plant / Herb:", herb_list)
+    if df_ayur.empty:
+        st.warning("Database unavailable. Please upload your CSV file to the root directory.")
+    else:
+        # Dual Filter Logic 
+        search_mode = st.radio("Select Database Search Method:", ["Search by Herb / Tree Name", "Search by Medicinal Activity"])
         
-        activities = df_ayur[df_ayur['Herb / Tree Name'] == selected_herb]['Medicinal Activity'].unique()
-        selected_activity = st.selectbox("Select Target Medicinal Activity / Property:", activities)
-        row = df_ayur[(df_ayur['Herb / Tree Name'] == selected_herb) & (df_ayur['Medicinal Activity'] == selected_activity)].iloc[0]
-        
-    else: 
-        activity_list = sorted(df_ayur['Medicinal Activity'].dropna().unique())
-        selected_activity = st.selectbox("Select Target Medicinal Activity:", activity_list)
-        
-        herb_list = sorted(df_ayur[df_ayur['Medicinal Activity'] == selected_activity]['Herb / Tree Name'].dropna().unique())
-        selected_herb = st.selectbox("Select Ayurvedic Plant / Herb:", herb_list)
-        row = df_ayur[(df_ayur['Herb / Tree Name'] == selected_herb) & (df_ayur['Medicinal Activity'] == selected_activity)].iloc[0]
-
-    st.session_state.ayur_row = row.to_dict()
-
-    # Enhanced Highlight Matrix for Ayurvedic Info with High Contrast Colors
-    st.markdown(f"""
-    <div style="background-color:#f8fafc; border-left:6px solid #16a34a; padding:15px; border-radius:8px; margin-bottom:20px; color: #1e293b; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-        <h3 style="color:#14532d; margin-top:0;">🌿 Botanical Identity: {row['Herb / Tree Name']} (<i>{row['Scientific Name']}</i>)</h3>
-        <p style="color:#334155; margin-bottom:4px;"><b>Family:</b> {row['Family']} | <b>Active Phytochemical:</b> {row['Phytochemical']}</p>
-        <p style="color:#334155; margin-top:0;"><b>Medicinal Activity:</b> {row['Medicinal Activity']} | <b>Protein Target:</b> {row['Target Protein / Receptor Name']} (PDB: {row['PDB ID']})</p>
-        <hr style="border: 0; height: 1px; background: #cbd5e1; margin: 12px 0;">
-        <p style="font-size:16px; color:#064e3b; font-style:italic; margin-bottom:4px;"><b>Sanskrit Shloka:</b> {row['Sanskrit Shloka (Bhavaprakasha Nighantu)']}</p>
-        <p style="font-size:13px; color:#0f766e; margin-top:0;"><b>Transliteration:</b> {row['Roman Transliteration']}</p>
-        <p style="color:#334155; margin-bottom:0; padding-top:8px; border-top:1px dashed #cbd5e1;"><b>Dravyaguna Profile:</b> {row['Dravyaguna Profile (Rasa/Virya/Vipaka)']} | <b>Classical Action:</b> {row['Classical Karma (Action)']}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if st.button("📥 Load Target & Ligand from Database", type="primary", use_container_width=True):
-        with st.spinner("Fetching PDB & Converting SMILES to 3D Space..."):
-            pdb_id = str(row['PDB ID']).strip()
-            smiles_str = str(row['Canonical SMILES']).strip()
+        if search_mode == "Search by Herb / Tree Name":
+            herb_list = sorted(df_ayur['Herb / Tree Name'].dropna().unique())
+            selected_herb = st.selectbox("Select Ayurvedic Plant / Herb:", herb_list)
             
-            success, path = fetch_pdb_from_rcsb(pdb_id)
-            if success:
-                st.session_state.local_target_path = path
-                st.session_state.pdb_id_display = pdb_id.upper()
-                st.session_state.protein_name = row['Target Protein / Receptor Name']
-                conv_ok, _ = convert_pdb_to_pdbqt(path, "protein.pdbqt")
-                st.session_state.target_ready = conv_ok
-            else:
-                st.error(f"Failed to fetch PDB {pdb_id} from RCSB. The ID might be invalid.")
+            activities = df_ayur[df_ayur['Herb / Tree Name'] == selected_herb]['Medicinal Activity'].unique()
+            selected_activity = st.selectbox("Select Target Medicinal Activity / Property:", activities)
+            row = df_ayur[(df_ayur['Herb / Tree Name'] == selected_herb) & (df_ayur['Medicinal Activity'] == selected_activity)].iloc[0]
             
-            ok, msg = convert_smiles_to_pdbqt(smiles_str, "ligand.pdbqt")
-            if ok:
-                st.session_state.ligand_ready = True
-                st.session_state.smiles_cache = smiles_str
-                iupac = get_iupac_name(smiles_str)
-                st.session_state.ligand_iupac = iupac
+        else: 
+            activity_list = sorted(df_ayur['Medicinal Activity'].dropna().unique())
+            selected_activity = st.selectbox("Select Target Medicinal Activity:", activity_list)
+            
+            herb_list = sorted(df_ayur[df_ayur['Medicinal Activity'] == selected_activity]['Herb / Tree Name'].dropna().unique())
+            selected_herb = st.selectbox("Select Ayurvedic Plant / Herb:", herb_list)
+            row = df_ayur[(df_ayur['Herb / Tree Name'] == selected_herb) & (df_ayur['Medicinal Activity'] == selected_activity)].iloc[0]
+
+        st.session_state.ayur_row = row.to_dict()
+
+        # Enhanced Highlight Matrix for Ayurvedic Info
+        st.markdown(f"""
+        <div style="background-color:#f8fafc; border-left:6px solid #16a34a; padding:15px; border-radius:8px; margin-bottom:10px; color: #1e293b; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <h3 style="color:#14532d; margin-top:0;">🌿 Botanical Identity: {row['Herb / Tree Name']} (<i>{row['Scientific Name']}</i>)</h3>
+            <p style="color:#334155; margin-bottom:4px;"><b>Family:</b> {row['Family']} | <b>Active Phytochemical:</b> {row['Phytochemical']}</p>
+            <p style="color:#334155; margin-top:0;"><b>Medicinal Activity:</b> {row['Medicinal Activity']} | <b>Protein Target:</b> {row['Target Protein / Receptor Name']} (PDB: {row['PDB ID']})</p>
+            <hr style="border: 0; height: 1px; background: #cbd5e1; margin: 12px 0;">
+            <p style="font-size:16px; color:#064e3b; font-style:italic; margin-bottom:4px;"><b>Sanskrit Shloka:</b> {row['Sanskrit Shloka (Bhavaprakasha Nighantu)']}</p>
+            <p style="font-size:13px; color:#0f766e; margin-top:0;"><b>Transliteration:</b> {row['Roman Transliteration']}</p>
+            <p style="color:#334155; margin-bottom:0; padding-top:8px; border-top:1px dashed #cbd5e1;"><b>Dravyaguna Profile:</b> {row['Dravyaguna Profile (Rasa/Virya/Vipaka)']} | <b>Classical Action:</b> {row['Classical Karma (Action)']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # COFACTOR REMOVAL TOGGLE
+        remove_cofactors = st.checkbox("Rebuild Matrix: Remove Co-factors & Water Molecules", value=True)
+        if remove_cofactors:
+            st.caption("*The receptor coordinate matrix will be rebuilt excluding non-standard residues (HETATM) to prevent steric clashes during blind docking.*")
+            
+        with st.expander("ℹ️ What is UFF / MMFF94 Energy Minimization? (Ligand Preparation)"):
+            st.markdown("""
+            **Energy Minimization** is critical before docking. The raw 2D SMILES string from the database is computationally flat. 
+            When converted to 3D space, atoms might be artificially forced too close together, resulting in high internal strain.
+            
+            This application uses the **Merck Molecular Force Field (MMFF94)** or **Universal Force Field (UFF)** to adjust the bond lengths, 
+            angles, and dihedral geometries of the phytochemical until it reaches a stable, low-energy conformation (local minimum). 
+            This ensures that the docking algorithm evaluates the naturally occurring, relaxed state of the drug molecule.
+            """)
+        
+        if st.button("📥 Load Target & Ligand from Database", type="primary", use_container_width=True):
+            with st.spinner("Fetching PDB & Performing UFF/MMFF94 Energy Minimization..."):
+                pdb_id = str(row['PDB ID']).strip()
+                smiles_str = str(row['Canonical SMILES']).strip()
                 
-                with open("ligand.pdbqt", "r") as f: st.session_state.serialized_ligand_block = f.read()
-                st.session_state.ligand_summary_text = f"**Phytochemical:** {row['Phytochemical']} <br> **IUPAC Nomenclature:** {iupac} <br> **Target Activity:** {row['Medicinal Activity']}"
-            else:
-                st.error(f"SMILES Error: {msg}")
+                success, path = fetch_pdb_from_rcsb(pdb_id)
+                if success:
+                    st.session_state.local_target_path = path
+                    st.session_state.pdb_id_display = pdb_id.upper()
+                    st.session_state.protein_name = row['Target Protein / Receptor Name']
+                    # Pass the remove_cofactor state to the converter
+                    conv_ok, _ = convert_pdb_to_pdbqt(path, "protein.pdbqt", remove_cofactors=remove_cofactors)
+                    st.session_state.target_ready = conv_ok
+                else:
+                    st.error(f"Failed to fetch PDB {pdb_id} from RCSB. The ID might be invalid.")
+                
+                ok, msg = convert_smiles_to_pdbqt(smiles_str, "ligand.pdbqt")
+                if ok:
+                    st.session_state.ligand_ready = True
+                    st.session_state.smiles_cache = smiles_str
+                    iupac = get_iupac_name(smiles_str)
+                    st.session_state.ligand_iupac = iupac
+                    
+                    with open("ligand.pdbqt", "r") as f: st.session_state.serialized_ligand_block = f.read()
+                    st.session_state.ligand_summary_text = f"**Phytochemical:** {row['Phytochemical']} <br> **IUPAC Nomenclature:** {iupac} <br> **Target Activity:** {row['Medicinal Activity']}"
+                else:
+                    st.error(f"SMILES Error: {msg}")
 
-            if st.session_state.target_ready and st.session_state.ligand_ready:
-                st.success("Target and Ligand successfully mounted from Database!")
-                trigger_rerun = True
+                if st.session_state.target_ready and st.session_state.ligand_ready:
+                    st.success("Target and Ligand successfully mounted from Database! Ligand has been energetically minimized.")
+                    trigger_rerun = True
 
     if st.session_state.target_ready and os.path.exists("ligand.pdbqt"): st.session_state.ligand_ready = True
     if st.session_state.ligand_ready: st.markdown(f"> **Ligand Metric Summary Profile:** \n> <br>{st.session_state.ligand_summary_text}", unsafe_allow_html=True)
