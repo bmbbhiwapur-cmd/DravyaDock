@@ -62,7 +62,10 @@ def initialize_session_states():
         "selected_variant_id": None,
         "style_mode": "cartoon",
         "surf_toggle": False,
-        "ayur_row": {}
+        "ayur_row": {},
+        "active_retained_ions": [],
+        "pre_uff_score": 0.0,
+        "post_uff_score": 0.0
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -79,6 +82,7 @@ def safe_rerun():
 # --- AYURVEDIC DATABASE LOADER (50 ENTRIES HARDCODED FOR STABILITY) ---
 @st.cache_data
 def load_ayurvedic_db():
+    # To prevent any CSV parsing errors, we use a perfectly formatted hardcoded list.
     hardcoded_data = [
         {"Master ID": "M-001", "Herb / Tree Name": "Neem", "Scientific Name": "Azadirachta indica", "Family": "Meliaceae", "Phytochemical": "Nimbin", "Canonical SMILES": "CC(=O)OC1C(C2(CC3C(C24C1C(O4)C(=C)C(=O)OC)CC(C5(C3CC(O5)C6=COCO6)C)OC(=O)C)C)C", "Medicinal Activity": "Antibacterial", "Target Protein / Receptor Name": "Penicillin-Binding Protein 2a (PBP2a)", "PDB ID": "1VQQ", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "निम्बः शीतो लघुस्तिक्तो व्रणशोधनरोपणः। चक्षुष्यः कफपित्तघ्नः कुष्ठहृत् कृमिहृत्परः॥", "Roman Transliteration": "nimbaḥ śīto laghustikto vraṇaśodhanaropaṇaḥ | cakṣuṣyaḥ kaphapittaghnaḥ kuṣṭhahṛt kṛmihṛtparaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya; Virya: Shita; Vipaka: Katu", "Classical Karma (Action)": "Krimighna (Antimicrobial) Vrana-shodhana Kusthaha"},
         {"Master ID": "M-002", "Herb / Tree Name": "Tulsi", "Scientific Name": "Ocimum sanctum", "Family": "Lamiaceae", "Phytochemical": "Eugenol", "Canonical SMILES": "COC1=C(C=CC(=C1)CC=C)O", "Medicinal Activity": "Antimicrobial", "Target Protein / Receptor Name": "Candida albicans Secreted Aspartyl Proteinase 1", "PDB ID": "1ZAP", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "तुलसी कटुका तिक्ता हृद्या उष्णा दाहपित्तकृत्। दीपनी कुष्ठकृच्छ्रास्त्रपार्श्वशूलविनाशिनी॥", "Roman Transliteration": "tulasī kaṭukā tiktā hṛdyā uṣṇā dāhapittakṛt | dīpanī kuṣṭhakṛcchrāstrapārśvaśūlavināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Krimighna Hridya (Cardioprotective) Dipana"},
@@ -101,7 +105,7 @@ def load_ayurvedic_db():
         {"Master ID": "M-019", "Herb / Tree Name": "Kalmegh", "Scientific Name": "Andrographis paniculata", "Family": "Acanthaceae", "Phytochemical": "Andrographolide", "Canonical SMILES": "CC1=C(C(=O)OC1C(C)C2CCC3(C2(CCC(C3=C)O)C)C)O", "Medicinal Activity": "Hepatoprotective", "Target Protein / Receptor Name": "Human Tumor Necrosis Factor Alpha", "PDB ID": "2TNF", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "कालमेघस्तु तिक्तोष्णः कफपित्तज्वरापहः। यकृतोत्तेजकः श्रेष्ठः क्रिमिकुष्ठविनाशनः॥", "Roman Transliteration": "kālameghastu tiktoṣṇaḥ kaphapittajvarāpahaḥ | yakṛtottejakaḥ śreṣṭhaḥ krimikuṣṭhavināśanaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Yakrut-uttejaka (Hepatoprotective) Jvarahara"},
         {"Master ID": "M-020", "Herb / Tree Name": "Karela (Bitter Melon)", "Scientific Name": "Momordica charantia", "Family": "Cucurbitaceae", "Phytochemical": "Charantin", "Canonical SMILES": "CC1CCC2(C(O1)C(C3C2(CCC4C3CCC5C4(CCC(C5)OC6C(C(C(C(O6)CO)O)O)O)C)C)O)C", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "Insulin Receptor Tyrosine Kinase", "PDB ID": "1IRK", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "कारवेल्लं कदु तीक्ष्णं तिक्तं पाके कटु स्मृतम्। दीपनं भेदनं हन्ति प्रमेहकफपित्तकृत्॥", "Roman Transliteration": "kāravellaṃ kadu tīkṣṇaṃ tiktaṃ pāke kaṭu smṛtam | dīpanāṃ bhedanāṃ hanti pramehakaphapittakṛt ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Dipana Raktashodhaka"},
         {"Master ID": "M-021", "Herb / Tree Name": "Moringa", "Scientific Name": "Moringa oleifera", "Family": "Moringaceae", "Phytochemical": "Quercetin", "Canonical SMILES": "C1=CC(=C(C=C1C2=C(C(=O)C3=C(O2)C=C(C=C3O)O)O)O)O", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "PI3K", "PDB ID": "4FA6", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "शिग्रुस्तीक्ष्णोष्णकटुकः कफवातशोथहृत्। क्रिमिकुष्ठव्रणघ्नश्च दीपनो भेदनो लघुः॥", "Roman Transliteration": "śigrustīkṣṇoṣṇakaṭukaḥ kaphavātaśothahṛt | krimikuṣṭhavraṇaghnaśca dīpano bhedano laghuḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Shothahara (Anti-inflammatory/Tumor) Krimighna Dipana"},
-        {"Master ID": "M-022", "Herb / Tree Name": "Cinnamon", "Scientific Name": "Cinnamomum verum", "Family": "Lauraceae", "Phytochemical": "Cinnamaldehyde", "Canonical SMILES": "C1=CC=C(C=C1)/C=C/C=O", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "PPAR-gamma", "PDB ID": "3DZY", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "त्वक्पत्रं लघु तीक्ष्णोष्णं कडु तिक्तं च रुच्यकम्। कफवातहरं कण्ठरुक्प्रमेहविनाशनम्॥", "Roman Transliteration": "tvakpatraṃ laghu tīkṣणोष्णं kaḍu tiktaṃ ca rucyakam | kaphavātaharaṃ kaṇṭharukpramehavināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Dipana Hridya"},
+        {"Master ID": "M-022", "Herb / Tree Name": "Cinnamon", "Scientific Name": "Cinnamomum verum", "Family": "Lauraceae", "Phytochemical": "Cinnamaldehyde", "Canonical SMILES": "C1=CC=C(C=C1)/C=C/C=O", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "PPAR-gamma", "PDB ID": "3DZY", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "त्वक्पत्रं लघु तीक्ष्णोष्णं कडु तिक्तं च रुच्यकम्। कफवातहरं कण्ठरुक्प्रमेहविनाशनम्॥", "Roman Transliteration": "tvakpatraṃ laghu tīkṣṇoṣṇaṃ kaḍu tiktaṃ ca rucyakam | kaphavātaharaṃ kaṇṭharukpramehavināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Dipana Hridya"},
         {"Master ID": "M-023", "Herb / Tree Name": "Haritaki", "Scientific Name": "Terminalia chebula", "Family": "Combretaceae", "Phytochemical": "Chebulinic Acid", "Canonical SMILES": "CC1C2C(C(C(O1)OC(=O)C3=CC(=C(C(=C3)O)O)O)OC(=O)C4=CC(=C(C(=C4)O)O)O)OC(=O)C5=CC(=C(C(=C5)O)O)O", "Medicinal Activity": "Antiviral", "Target Protein / Receptor Name": "Hepatitis C Virus NS3/4A Protease", "PDB ID": "4A92", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "हरीतकी मानुषीणां मातेव हितकारिणी। प्रमेहकुष्ठशोथार्शःकामलाक्रिमिनाशिनी॥", "Roman Transliteration": "harītakī mānuṣīṇāṃ māteva hitakāriṇī | pramehakuṣṭhaśothārśaḥkāmalākrimināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya Madhura Amla Katu Tikta; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Tridosahara Anulomana (Laxative) Krimighna"},
         {"Master ID": "M-024", "Herb / Tree Name": "Baheda", "Scientific Name": "Terminalia bellirica", "Family": "Combretaceae", "Phytochemical": "Bellericanin", "Canonical SMILES": "C1=CC(=C(C=C1)O)C2=CC(=O)C3=C(O2)C=C(C(=C3O)O)O", "Medicinal Activity": "Antimicrobial", "Target Protein / Receptor Name": "Staphylococcus aureus Dihydrofolate Reductase", "PDB ID": "2W9S", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "बिभीतकं स्वादुपाकं कषायं कफपित्तनुत्। उष्णवीर्यं चक्षुष्यं केश्यं क्रिमिनाशनम्॥", "Roman Transliteration": "bibhītakaṃ svādupākaṃ kaṣāyaṃ kaphapittanut | uṣṇavīryaṃ cakṣuṣyaṃ keśyaṃ krimināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Krimighna Kanthya (Throat-soothing) Chakshushya"},
         {"Master ID": "M-025", "Herb / Tree Name": "Bel", "Scientific Name": "Aegle marmelos", "Family": "Rutaceae", "Phytochemical": "Marmin", "Canonical SMILES": "CC(=CCOCCC1=CC=C2C(=C1)C=CC(=O)O2)C", "Medicinal Activity": "Gastroprotective", "Target Protein / Receptor Name": "H+/K+-ATPase (Proton Pump)", "PDB ID": "5YLV", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "बिल्वं कषायं मधुरं पाचकं दीपनं लघु। उष्णं कफवातहरं ग्राही विबन्धाध्माननाशनम्॥", "Roman Transliteration": "bilvaṃ kaṣāyaṃ madhuraṃ pācakaṃ dīpanaṃ laghu | uṣṇaṃ kaphavātaharaṃ grāhī vibandhādhmānanaśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Grahi (Gastroprotective) Dipana Pachana"},
@@ -132,6 +136,10 @@ def load_ayurvedic_db():
         {"Master ID": "M-050", "Herb / Tree Name": "Vasaka", "Scientific Name": "Justicia adhatoda", "Family": "Acanthaceae", "Phytochemical": "Vasicinone", "Canonical SMILES": "C1CC2=NC3=CC=CC=C3C(=O)C4C2(C1)N=C(O4)C", "Medicinal Activity": "Mucolytic", "Target Protein / Receptor Name": "Human Muscarinic Acetylcholine Receptor M3", "PDB ID": "4DA4", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "वासको वासिका वासा भिषङ्माता च सिंहिका। वासा तिक्ता कषायोष्णा कफपित्तविनाशिनी॥", "Roman Transliteration": "vāsako vāsikā vāsā bhiṣaṅmātā ca siṃhikā | vāsā tiktā kaṣāyoṣṇā kaphapittavināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya; Virya: Shita; Vipaka: Katu", "Classical Karma (Action)": "Kashahara (Antitussive) Shwasahara (Bronchodilator)"}
     ]
     return pd.DataFrame(hardcoded_data)
+
+# =====================================================================
+# 2. BIOINFORMATICS STRUCTURAL CONVERTERS & PARSERS
+# =====================================================================
 
 def get_iupac_name(smiles):
     try:
@@ -319,14 +327,22 @@ def convert_pdb_to_pdbqt(input_pdb, output_pdbqt="protein.pdbqt", is_ligand=Fals
 def convert_smiles_to_pdbqt(smiles_string, output_filename="ligand.pdbqt"):
     pre_energy, post_energy = 0.0, 0.0
     try:
+        # SUPER STRICT SMILES CHECK
+        if not smiles_string or not isinstance(smiles_string, str) or len(smiles_string.strip()) == 0:
+            return False, "SMILES string is empty or invalid.", 0, 0
+            
+        smiles_string = smiles_string.strip()
         mol = Chem.MolFromSmiles(smiles_string)
-        if mol is None: return False, "Invalid SMILES.", 0, 0
+        if mol is None: return False, "RDKit could not parse this SMILES structure.", 0, 0
+        
         mol = Chem.AddHs(mol)
         params = AllChem.ETKDGv3()
         params.useRandomCoords = True
         params.maxIterations = 1000
         res = AllChem.EmbedMolecule(mol, params)
-        if res != 0: AllChem.EmbedMolecule(mol, useRandomCoords=True)
+        if res != 0: res = AllChem.EmbedMolecule(mol, useRandomCoords=True)
+        if res != 0: return False, "RDKit failed to generate 3D coordinates. Structure may be too complex.", 0, 0
+        
         try:
             if AllChem.MMFFHasAllMoleculeParams(mol):
                 mp = AllChem.MMFFGetMoleculeProperties(mol)
@@ -342,12 +358,14 @@ def convert_smiles_to_pdbqt(smiles_string, output_filename="ligand.pdbqt"):
                     ff.Minimize(maxIts=500)
                     post_energy = ff.CalcEnergy()
         except: pass
+        
         temp_pdb = "temp_ligand.pdb"
         Chem.MolToPDBFile(mol, temp_pdb)
         ok, msg = convert_pdb_to_pdbqt(temp_pdb, output_filename, is_ligand=True)
         if os.path.exists(temp_pdb): os.remove(temp_pdb)
         return ok, msg, pre_energy, post_energy
-    except Exception as e: return False, str(e), 0, 0
+    except Exception as e: 
+        return False, f"Critical RDKit Error: {str(e)}", 0, 0
 
 def execute_uff_complex_minimization(protein_path, ligand_pose_str, progress_ui=None):
     try:
@@ -460,6 +478,15 @@ def parse_vina_output_with_residues_global(stdout_text, docking_file="docking_po
                 data.append({"Binding Mode": mode_idx, "Affinity (kcal/mol)": aff, "RMSD l.b.": rmsd_lb, "RMSD u.b.": rmsd_ub, "Interacting Residues": res_string, "Contact Bond Types": bond_types})
             except ValueError: continue
     return pd.DataFrame(data)
+
+def format_interaction_matrix_text(interactions_list):
+    if not interactions_list: return "- No close contacts detected under 3.8 Angstroms."
+    df = pd.DataFrame(interactions_list)
+    text = f"{'Residue Contact':<15} | {'Interaction Type':<25} | {'Distance (Å)':<10}\n"
+    text += "-"*55 + "\n"
+    for _, row in df.iterrows():
+        text += f"{row['Residue Contact']:<15} | {row['Interaction Type']:<25} | {row['Distance (Å)']:<10}\n"
+    return text
 
 # =====================================================================
 # 3. FRAGMENTATION & ADVANCED ADME MODULE
@@ -592,20 +619,8 @@ def calculate_advanced_adme(smiles):
     except Exception: return default_adme
 
 # =====================================================================
-# 4. HIGH PERFORMANCE VISUALIZATION UTILITIES
+# 4. HIGH PERFORMANCE VISUALIZATION UTILITIES & HTML REPORTING
 # =====================================================================
-
-def generate_2d_ligand_img(mol):
-    if mol is None: return None
-    try:
-        mol_flat = Chem.Mol(mol)
-        Chem.SanitizeMol(mol_flat)
-        AllChem.Compute2DCoords(mol_flat)
-        img = Draw.MolToImage(mol_flat, size=(340, 260))
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return base64.b64encode(buf.getvalue()).decode('utf-8')
-    except Exception: return None
 
 def generate_clean_2d_image(smiles_str, include_labels=False, zoom_level=450):
     try:
@@ -613,8 +628,7 @@ def generate_clean_2d_image(smiles_str, include_labels=False, zoom_level=450):
         if mol:
             mol_to_draw = Chem.RemoveHs(mol)
             if include_labels:
-                for atom in mol_to_draw.GetAtoms():
-                    atom.SetProp('atomNote', str(atom.GetIdx()))
+                for atom in mol_to_draw.GetAtoms(): atom.SetProp('atomNote', str(atom.GetIdx()))
             img = Draw.MolToImage(mol_to_draw, size=(zoom_level, int(zoom_level * 0.77)))
             buffered = io.BytesIO()
             img.save(buffered, format="PNG")
@@ -630,10 +644,8 @@ def generate_ftir_image(target_peak):
     transmittance = np.clip(baseline - effect, 5.0, 100.0)
     fig, ax = plt.subplots(figsize=(8, 3.5))
     ax.plot(wavenumbers, transmittance, color='#1e3c72', linewidth=2)
-    ax.set_xlim(4000, 400)
-    ax.set_ylim(0, 105)
-    ax.set_xlabel("Wavenumber (cm⁻¹)")
-    ax.set_ylabel("Transmittance (%)")
+    ax.set_xlim(4000, 400); ax.set_ylim(0, 105)
+    ax.set_xlabel("Wavenumber (cm⁻¹)"); ax.set_ylabel("Transmittance (%)")
     ax.grid(True, linestyle='--', alpha=0.6)
     ax.fill_between(wavenumbers, transmittance, 105, color='#1e3c72', alpha=0.05)
     buf = io.BytesIO()
@@ -682,6 +694,129 @@ def render_advanced_modeling_blueprint(receptor_data, ligand_data, mode="cartoon
     </script>
     """
     components.html(html_content, height=510)
+
+def build_phase1_html_report(meta, p_2d, smiles_cache, grid_params, df_results_p1, orig_ints, receptor_data, orig_ligand_pose_data, selected_pose_orig, style_mode, show_surface, pre_uff, post_uff, delta_uff, active_retained_ions, uff_theory_html, orig_matrix_html, grid_strategy):
+    res_html = "<p>No docking data.</p>"
+    if df_results_p1 is not None and not df_results_p1.empty:
+        res_html = '<table class="dataframe table"><thead><tr>'
+        for col in df_results_p1.columns: res_html += f'<th>{col}</th>'
+        res_html += '</tr></thead><tbody>'
+        for _, row in df_results_p1.iterrows():
+            res_html += '<tr>'
+            for col in df_results_p1.columns:
+                val = row[col]
+                style = ''
+                if col == 'Affinity (kcal/mol)':
+                    try:
+                        v = float(val)
+                        if v < 0: style = 'style="color: #10b981; font-weight: bold;"'
+                        elif v > 0: style = 'style="color: #ef4444; font-weight: bold;"'
+                    except: pass
+                res_html += f'<td {style}>{val}</td>'
+            res_html += '</tr>'
+        res_html += '</tbody></table>'
+
+    safe_rec = str(receptor_data).replace('`', '').replace('\\', '\\\\')
+    safe_lig_orig = str(orig_ligand_pose_data).replace('`', '').replace('\\', '\\\\')
+
+    int_lines_js1 = ""
+    for interact in orig_ints:
+        color = "yellow" if "Hydrogen" in interact["Interaction Type"] else "cyan"
+        int_lines_js1 += f"viewer1.addCylinder({{start:{{x:{interact['r_coord'][0]}, y:{interact['r_coord'][1]}, z:{interact['r_coord'][2]}}}, end:{{x:{interact['l_coord'][0]}, y:{interact['l_coord'][1]}, z:{interact['l_coord'][2]}}}, radius:0.07, color:'{color}', dashed:true}});\n"
+        int_lines_js1 += f"viewer1.addLabel(\"{interact['Residue Contact']}\", {{position:{{x:{interact['r_coord'][0]}, y:{interact['r_coord'][1]}, z:{interact['r_coord'][2]}}}, backgroundColor:'white', fontColor:'black', backgroundOpacity:0.8, fontSize:10}});\n"
+
+    if style_mode == 'cartoon': style_js = "viewer1.setStyle({model: 0}, {cartoon: {colorscheme: 'chain', style: 'oval', thickness: 0.6}});"
+    elif style_mode == 'spacefill': style_js = "viewer1.setStyle({model: 0}, {sphere: {colorscheme: 'chain', radius:1.1}});"
+    elif style_mode == 'sticks': style_js = "viewer1.setStyle({model: 0}, {stick: {colorscheme: 'chain', radius:0.25}});"
+    else: style_js = "viewer1.setStyle({model: 0}, {cartoon: {colorscheme: 'chain', style: 'oval', thickness: 0.6}});"
+        
+    surface_js = "viewer1.addSurface($3Dmol.SurfaceType.VDW, {opacity:0.45, colorscheme:{prop:'b',gradient:'rwb'}}, {model:0});" if show_surface else ""
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Dravyaguna Analysis and Redesign Final Report</title>
+        <style>
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 0; background-color: #f9f9fb; }}
+            .header-banner {{ background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 25px; border-bottom: 5px solid #00c6ff; text-align: center; position: relative; }}
+            .header-banner h1 {{ margin: 0; font-size: 28px; letter-spacing: 1px; }}
+            .header-banner p {{ margin: 5px 0 0 0; font-size: 14px; opacity: 0.9; }}
+            .container {{ max-width: 1000px; margin: 30px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }}
+            h2, h3, h4 {{ color: #1e3c72; }}
+            h2 {{ border-bottom: 2px solid #eef2f7; padding-bottom: 8px; margin-top: 35px; font-size: 20px; }}
+            h3 {{ font-size: 16px; margin-top: 20px; }}
+            h4 {{ font-size: 15px; margin-top: 15px; text-align: center; }}
+            .meta-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; background: #f4f7f6; padding: 20px; border-radius: 8px; }}
+            .meta-item {{ font-size: 14px; }}
+            .meta-item strong {{ color: #1e3c72; }}
+            .table-wrapper {{ overflow-x: auto; margin: 20px 0; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }}
+            table {{ width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }}
+            th, td {{ border: 1px solid #e2e8f0; padding: 10px; text-align: left; }}
+            th {{ background-color: #f8fafc; color: #1e3c72; font-weight: 600; }}
+            .structure-img {{ background: white; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; max-width: 320px; text-align: center; margin: 0 auto; }}
+        </style>
+    </head>
+    <body>
+        <div class="header-banner">
+            <h1>🌿 Dravyaguna Analysis and Redesign Final Report</h1>
+            <p>Department of Chemistry, Shivaji Science College, Nagpur, India</p>
+        </div>
+        
+        <div class="container">
+            <h2>1. Baseline Docking Configuration & Target Matrix</h2>
+            <div class="meta-grid">
+                <div class="meta-item"><strong>Target Protein:</strong> {meta['name']}</div>
+                <div class="meta-item"><strong>PDB ID:</strong> {meta['id']}</div>
+                <div class="meta-item"><strong>Catalytic Cofactors Filter:</strong> {active_retained_ions}</div>
+                <div class="meta-item"><strong>Ligand (SMILES):</strong> <span style="word-break: break-all; font-family: monospace;">{smiles_cache}</span></div>
+                <div class="meta-item"><strong>Grid Search Strategy:</strong> {grid_strategy}</div>
+                <div class="meta-item"><strong>Grid Box (X,Y,Z):</strong> {grid_params['cx']}, {grid_params['cy']}, {grid_params['cz']}</div>
+                <div class="meta-item"><strong>Grid Dimensions (Å):</strong> {grid_params['sx']} × {grid_params['sy']} × {grid_params['sz']}</div>
+            </div>
+
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h4>Lead Ligand 2D Topology</h4>
+                <div class="structure-img">{p_2d}</div>
+            </div>
+
+            <h2>2. Baseline Molecular Docking Screening Results</h2>
+            <div class="table-wrapper">
+                {res_html}
+            </div>
+
+            <h2>3. Local Contact Residues & Bond Assignments Matrix (Pose {selected_pose_orig})</h2>
+            <div class="table-wrapper">
+                {orig_matrix_html}
+            </div>
+
+            <h2>4. Interactive 3D Protein-Ligand View</h2>
+            <div id="container-3d-orig" style="height: 500px; width: 100%; position: relative; border-radius:8px; border:1px solid #eaeaea; background:#ffffff;"></div>
+            
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.0.4/3Dmol-min.js"></script>
+            <script>
+                let viewer1 = $3Dmol.createViewer(document.getElementById('container-3d-orig'), {{backgroundColor: '#ffffff'}});
+                let rec_data = `{safe_rec}`; let lig_data_orig = `{safe_lig_orig}`;
+                if (rec_data.trim().length > 0) {{ viewer1.addModel(rec_data, 'pdb'); {style_js} }}
+                if (lig_data_orig.trim().length > 0) {{ viewer1.addModel(lig_data_orig, 'pdb'); viewer1.setStyle({{model: 1}}, {{stick: {{colorscheme: 'greenCarbon', radius: 0.28}}}}); }}
+                {surface_js} {int_lines_js1} viewer1.zoomTo(); viewer1.render();
+            </script>
+            
+            <div class="section" style="border-left: 6px solid #1e3c72; background-color: #f4f8fd; padding:15px; margin-top:30px;">
+                <h2>5. Scientific Methodology & Manuscript Citation Track</h2>
+                <p><i>The following standard protocol text is generated dynamically to assist in manuscript development and formal peer-reviewed reporting:</i></p>
+                <blockquote style="background: #fff; padding: 12px; border-left: 4px solid #1e3c72; font-style: italic; margin: 10px 0;">
+                    Molecular docking was performed using the semi-empirical force field parameters of AutoDock Vina inside the DravyaDock framework. To maintain structural and biological validity, essential catalytic cofactor ions were explicitly preserved within the target binding cleft during search configurations. Potential localized steric constraints and rigid atomic wall collisions resulting from structural constraints were resolved by subjecting the final protein-ligand complexes to post-docking energy minimization using the Universal Force Field (UFF) optimized to a convergence tolerance of 10<sup>-4</sup> kcal/mol·Å.
+                </blockquote>
+            </div>
+            
+            {uff_theory_html}
+            
+        </div>
+    </body>
+    </html>
+    """
 
 def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, shift_msg, f_img, v_2d, p_2d, 
                                     smiles_cache, baseline_affinity, grid_params, df_results_baseline, df_results_redesign, 
@@ -756,8 +891,10 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
             .header-banner p {{ margin: 5px 0 0 0; font-size: 14px; opacity: 0.9; }}
             .copyright-header {{ font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.7); margin-bottom: 10px; display: block; }}
             .container {{ max-width: 1000px; margin: 30px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }}
-            h2 {{ color: #1e3c72; border-bottom: 2px solid #eef2f7; padding-bottom: 8px; margin-top: 35px; font-size: 20px; }}
-            h3 {{ color: #2a5298; font-size: 16px; margin-top: 20px; }}
+            h2, h3, h4 {{ color: #1e3c72; }}
+            h2 {{ border-bottom: 2px solid #eef2f7; padding-bottom: 8px; margin-top: 35px; font-size: 20px; }}
+            h3 {{ font-size: 16px; margin-top: 20px; }}
+            h4 {{ font-size: 15px; margin-top: 15px; text-align: center; }}
             .meta-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; background: #f4f7f6; padding: 20px; border-radius: 8px; }}
             .meta-item {{ font-size: 14px; }}
             .meta-item strong {{ color: #1e3c72; }}
@@ -946,7 +1083,7 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
                 <h2>8. Scientific Methodology & Manuscript Citation Track</h2>
                 <p><i>The following standard protocol text is generated dynamically to assist in manuscript development and formal peer-reviewed reporting:</i></p>
                 <blockquote style="background: #fff; padding: 12px; border-left: 4px solid #1e3c72; font-style: italic; margin: 10px 0;">
-                    Molecular docking was performed using the semi-empirical force field parameters of AutoDock Vina inside the InSilico BioSphere framework. To maintain structural and biological validity, essential catalytic cofactor ions were explicitly preserved within the target binding cleft during search configurations. Potential localized steric constraints and rigid atomic wall collisions resulting from structural constraints were resolved by subjecting the final protein-ligand complexes to post-docking energy minimization using the Universal Force Field (UFF) optimized to a convergence tolerance of 10<sup>-4</sup> kcal/mol·Å.
+                    Molecular docking was performed using the semi-empirical force field parameters of AutoDock Vina inside the DravyaDock framework. To maintain structural and biological validity, essential catalytic cofactor ions were explicitly preserved within the target binding cleft during search configurations. Potential localized steric constraints and rigid atomic wall collisions resulting from structural constraints were resolved by subjecting the final protein-ligand complexes to post-docking energy minimization using the Universal Force Field (UFF) optimized to a convergence tolerance of 10<sup>-4</sup> kcal/mol·Å.
                 </blockquote>
             </div>
 
@@ -987,6 +1124,12 @@ if st.button("🔄 Reset Entire Environment", type="secondary", use_container_wi
         if os.path.exists(f): os.remove(f)
     st.success("Dashboard cache and runtime structures completely cleared!")
     safe_rerun()
+
+# ---------------------------------------------------------------------
+# SAFEGUARD FALLBACKS
+# ---------------------------------------------------------------------
+if os.path.exists("protein.pdbqt"): st.session_state.target_ready = True
+if os.path.exists("ligand.pdbqt"): st.session_state.ligand_ready = True
 
 # ---------------------------------------------------------------------
 # PHASE 1: CORE BASELINE DOCKING ENGINE
@@ -1059,7 +1202,6 @@ with col_params:
             current_selections = []
             for i, ion in enumerate(ions_list):
                 with cols[i % 3]:
-                    # Create a checkbox for each ion found
                     label = f"{ion['res_name']} ({ion['chain']}:{ion['seq']})"
                     if st.checkbox(label, value=False, key=f"ion_{ion['key']}"):
                         current_selections.append(ion['key'])
@@ -1076,7 +1218,7 @@ with col_params:
         angles, and dihedral geometries of the phytochemical until it reaches a stable, low-energy conformation (local minimum). 
         This ensures that the docking algorithm evaluates the naturally occurring, relaxed state of the drug molecule.
         """)
-
+    
     if st.button("📥 Rebuild Clean Receptor & Optimize Ligand Matrix", type="primary", use_container_width=True):
         with st.spinner("Rebuilding Receptor Matrix & Performing UFF/MMFF94 Energy Minimization..."):
             smiles_str = str(row['Canonical SMILES']).strip()
