@@ -7,7 +7,6 @@ import urllib.request
 import urllib.parse
 import json
 import re
-import glob
 import numpy as np
 import pandas as pd
 import streamlit.components.v1 as components
@@ -55,15 +54,23 @@ def initialize_session_states():
         "serialized_ligand_block": None,
         "ligand_summary_text": "",
         "smiles_cache": "",
-        "ligand_iupac": "Pending...",
         "baseline_affinity": None,
+        "baseline_pre_uff": "N/A",
+        "baseline_post_uff": "N/A",
+        "baseline_delta_uff": "N/A",
         "redesign_baseline_affinity": None,
         "rd_library": None,
         "selected_variant_id": None,
         "style_mode": "cartoon",
         "surf_toggle": False,
-        "ayur_row": {},
         "active_retained_ions": [],
+        "uff_cache": {},
+        "last_uploaded_protein": "",
+        "last_uploaded_ligand": "",
+        "detected_pockets": [],
+        "selected_native_ligand": "Manual Coordinate Assignment",
+        "ayur_row": {},
+        "ligand_iupac": "Pending...",
         "pre_uff_score": 0.0,
         "post_uff_score": 0.0
     }
@@ -82,7 +89,6 @@ def safe_rerun():
 # --- AYURVEDIC DATABASE LOADER (50 ENTRIES HARDCODED FOR STABILITY) ---
 @st.cache_data
 def load_ayurvedic_db():
-    # To prevent any CSV parsing errors, we use a perfectly formatted hardcoded list.
     hardcoded_data = [
         {"Master ID": "M-001", "Herb / Tree Name": "Neem", "Scientific Name": "Azadirachta indica", "Family": "Meliaceae", "Phytochemical": "Nimbin", "Canonical SMILES": "CC(=O)OC1C(C2(CC3C(C24C1C(O4)C(=C)C(=O)OC)CC(C5(C3CC(O5)C6=COCO6)C)OC(=O)C)C)C", "Medicinal Activity": "Antibacterial", "Target Protein / Receptor Name": "Penicillin-Binding Protein 2a (PBP2a)", "PDB ID": "1VQQ", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "निम्बः शीतो लघुस्तिक्तो व्रणशोधनरोपणः। चक्षुष्यः कफपित्तघ्नः कुष्ठहृत् कृमिहृत्परः॥", "Roman Transliteration": "nimbaḥ śīto laghustikto vraṇaśodhanaropaṇaḥ | cakṣuṣyaḥ kaphapittaghnaḥ kuṣṭhahṛt kṛmihṛtparaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya; Virya: Shita; Vipaka: Katu", "Classical Karma (Action)": "Krimighna (Antimicrobial) Vrana-shodhana Kusthaha"},
         {"Master ID": "M-002", "Herb / Tree Name": "Tulsi", "Scientific Name": "Ocimum sanctum", "Family": "Lamiaceae", "Phytochemical": "Eugenol", "Canonical SMILES": "COC1=C(C=CC(=C1)CC=C)O", "Medicinal Activity": "Antimicrobial", "Target Protein / Receptor Name": "Candida albicans Secreted Aspartyl Proteinase 1", "PDB ID": "1ZAP", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "तुलसी कटुका तिक्ता हृद्या उष्णा दाहपित्तकृत्। दीपनी कुष्ठकृच्छ्रास्त्रपार्श्वशूलविनाशिनी॥", "Roman Transliteration": "tulasī kaṭukā tiktā hṛdyā uṣṇā dāhapittakṛt | dīpanī kuṣṭhakṛcchrāstrapārśvaśūlavināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Krimighna Hridya (Cardioprotective) Dipana"},
@@ -105,7 +111,7 @@ def load_ayurvedic_db():
         {"Master ID": "M-019", "Herb / Tree Name": "Kalmegh", "Scientific Name": "Andrographis paniculata", "Family": "Acanthaceae", "Phytochemical": "Andrographolide", "Canonical SMILES": "CC1=C(C(=O)OC1C(C)C2CCC3(C2(CCC(C3=C)O)C)C)O", "Medicinal Activity": "Hepatoprotective", "Target Protein / Receptor Name": "Human Tumor Necrosis Factor Alpha", "PDB ID": "2TNF", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "कालमेघस्तु तिक्तोष्णः कफपित्तज्वरापहः। यकृतोत्तेजकः श्रेष्ठः क्रिमिकुष्ठविनाशनः॥", "Roman Transliteration": "kālameghastu tiktoṣṇaḥ kaphapittajvarāpahaḥ | yakṛtottejakaḥ śreṣṭhaḥ krimikuṣṭhavināśanaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Yakrut-uttejaka (Hepatoprotective) Jvarahara"},
         {"Master ID": "M-020", "Herb / Tree Name": "Karela (Bitter Melon)", "Scientific Name": "Momordica charantia", "Family": "Cucurbitaceae", "Phytochemical": "Charantin", "Canonical SMILES": "CC1CCC2(C(O1)C(C3C2(CCC4C3CCC5C4(CCC(C5)OC6C(C(C(C(O6)CO)O)O)O)C)C)O)C", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "Insulin Receptor Tyrosine Kinase", "PDB ID": "1IRK", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "कारवेल्लं कदु तीक्ष्णं तिक्तं पाके कटु स्मृतम्। दीपनं भेदनं हन्ति प्रमेहकफपित्तकृत्॥", "Roman Transliteration": "kāravellaṃ kadu tīkṣṇaṃ tiktaṃ pāke kaṭu smṛtam | dīpanāṃ bhedanāṃ hanti pramehakaphapittakṛt ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Dipana Raktashodhaka"},
         {"Master ID": "M-021", "Herb / Tree Name": "Moringa", "Scientific Name": "Moringa oleifera", "Family": "Moringaceae", "Phytochemical": "Quercetin", "Canonical SMILES": "C1=CC(=C(C=C1C2=C(C(=O)C3=C(O2)C=C(C=C3O)O)O)O)O", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "PI3K", "PDB ID": "4FA6", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "शिग्रुस्तीक्ष्णोष्णकटुकः कफवातशोथहृत्। क्रिमिकुष्ठव्रणघ्नश्च दीपनो भेदनो लघुः॥", "Roman Transliteration": "śigrustīkṣṇoṣṇakaṭukaḥ kaphavātaśothahṛt | krimikuṣṭhavraṇaghnaśca dīpano bhedano laghuḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Shothahara (Anti-inflammatory/Tumor) Krimighna Dipana"},
-        {"Master ID": "M-022", "Herb / Tree Name": "Cinnamon", "Scientific Name": "Cinnamomum verum", "Family": "Lauraceae", "Phytochemical": "Cinnamaldehyde", "Canonical SMILES": "C1=CC=C(C=C1)/C=C/C=O", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "PPAR-gamma", "PDB ID": "3DZY", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "त्वक्पत्रं लघु तीक्ष्णोष्णं कडु तिक्तं च रुच्यकम्। कफवातहरं कण्ठरुक्प्रमेहविनाशनम्॥", "Roman Transliteration": "tvakpatraṃ laghu tīkṣṇoṣṇaṃ kaḍu tiktaṃ ca rucyakam | kaphavātaharaṃ kaṇṭharukpramehavināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Dipana Hridya"},
+        {"Master ID": "M-022", "Herb / Tree Name": "Cinnamon", "Scientific Name": "Cinnamomum verum", "Family": "Lauraceae", "Phytochemical": "Cinnamaldehyde", "Canonical SMILES": "C1=CC=C(C=C1)/C=C/C=O", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "PPAR-gamma", "PDB ID": "3DZY", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "त्वक्पत्रं लघु तीक्ष्णोष्णं कडु तिक्तं च रुच्यकम्। कफवातहरं कण्ठरुक्प्रमेहविनाशनम्॥", "Roman Transliteration": "tvakpatraṃ laghu tīkṣणोष्णं kaḍu tiktaṃ ca rucyakam | kaphavātaharaṃ kaṇṭharukpramehavināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Dipana Hridya"},
         {"Master ID": "M-023", "Herb / Tree Name": "Haritaki", "Scientific Name": "Terminalia chebula", "Family": "Combretaceae", "Phytochemical": "Chebulinic Acid", "Canonical SMILES": "CC1C2C(C(C(O1)OC(=O)C3=CC(=C(C(=C3)O)O)O)OC(=O)C4=CC(=C(C(=C4)O)O)O)OC(=O)C5=CC(=C(C(=C5)O)O)O", "Medicinal Activity": "Antiviral", "Target Protein / Receptor Name": "Hepatitis C Virus NS3/4A Protease", "PDB ID": "4A92", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "हरीतकी मानुषीणां मातेव हितकारिणी। प्रमेहकुष्ठशोथार्शःकामलाक्रिमिनाशिनी॥", "Roman Transliteration": "harītakī mānuṣīṇāṃ māteva hitakāriṇī | pramehakuṣṭhaśothārśaḥkāmalākrimināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya Madhura Amla Katu Tikta; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Tridosahara Anulomana (Laxative) Krimighna"},
         {"Master ID": "M-024", "Herb / Tree Name": "Baheda", "Scientific Name": "Terminalia bellirica", "Family": "Combretaceae", "Phytochemical": "Bellericanin", "Canonical SMILES": "C1=CC(=C(C=C1)O)C2=CC(=O)C3=C(O2)C=C(C(=C3O)O)O", "Medicinal Activity": "Antimicrobial", "Target Protein / Receptor Name": "Staphylococcus aureus Dihydrofolate Reductase", "PDB ID": "2W9S", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "बिभीतकं स्वादुपाकं कषायं कफपित्तनुत्। उष्णवीर्यं चक्षुष्यं केश्यं क्रिमिनाशनम्॥", "Roman Transliteration": "bibhītakaṃ svādupākaṃ kaṣāyaṃ kaphapittanut | uṣṇavīryaṃ cakṣuṣyaṃ keśyaṃ krimināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Krimighna Kanthya (Throat-soothing) Chakshushya"},
         {"Master ID": "M-025", "Herb / Tree Name": "Bel", "Scientific Name": "Aegle marmelos", "Family": "Rutaceae", "Phytochemical": "Marmin", "Canonical SMILES": "CC(=CCOCCC1=CC=C2C(=C1)C=CC(=O)O2)C", "Medicinal Activity": "Gastroprotective", "Target Protein / Receptor Name": "H+/K+-ATPase (Proton Pump)", "PDB ID": "5YLV", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "बिल्वं कषायं मधुरं पाचकं दीपनं लघु। उष्णं कफवातहरं ग्राही विबन्धाध्माननाशनम्॥", "Roman Transliteration": "bilvaṃ kaṣāyaṃ madhuraṃ pācakaṃ dīpanaṃ laghu | uṣṇaṃ kaphavātaharaṃ grāhī vibandhādhmānanaśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Grahi (Gastroprotective) Dipana Pachana"},
@@ -136,10 +142,6 @@ def load_ayurvedic_db():
         {"Master ID": "M-050", "Herb / Tree Name": "Vasaka", "Scientific Name": "Justicia adhatoda", "Family": "Acanthaceae", "Phytochemical": "Vasicinone", "Canonical SMILES": "C1CC2=NC3=CC=CC=C3C(=O)C4C2(C1)N=C(O4)C", "Medicinal Activity": "Mucolytic", "Target Protein / Receptor Name": "Human Muscarinic Acetylcholine Receptor M3", "PDB ID": "4DA4", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "वासको वासिका वासा भिषङ्माता च सिंहिका। वासा तिक्ता कषायोष्णा कफपित्तविनाशिनी॥", "Roman Transliteration": "vāsako vāsikā vāsā bhiṣaṅmātā ca siṃhikā | vāsā tiktā kaṣāyoṣṇā kaphapittavināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya; Virya: Shita; Vipaka: Katu", "Classical Karma (Action)": "Kashahara (Antitussive) Shwasahara (Bronchodilator)"}
     ]
     return pd.DataFrame(hardcoded_data)
-
-# =====================================================================
-# 2. BIOINFORMATICS STRUCTURAL CONVERTERS & PARSERS
-# =====================================================================
 
 def get_iupac_name(smiles):
     try:
@@ -327,7 +329,6 @@ def convert_pdb_to_pdbqt(input_pdb, output_pdbqt="protein.pdbqt", is_ligand=Fals
 def convert_smiles_to_pdbqt(smiles_string, output_filename="ligand.pdbqt"):
     pre_energy, post_energy = 0.0, 0.0
     try:
-        # SUPER STRICT SMILES CHECK
         if not smiles_string or not isinstance(smiles_string, str) or len(smiles_string.strip()) == 0:
             return False, "SMILES string is empty or invalid.", 0, 0
             
@@ -891,9 +892,8 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
             .header-banner p {{ margin: 5px 0 0 0; font-size: 14px; opacity: 0.9; }}
             .copyright-header {{ font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.7); margin-bottom: 10px; display: block; }}
             .container {{ max-width: 1000px; margin: 30px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }}
-            h2, h3, h4 {{ color: #1e3c72; }}
-            h2 {{ border-bottom: 2px solid #eef2f7; padding-bottom: 8px; margin-top: 35px; font-size: 20px; }}
-            h3 {{ font-size: 16px; margin-top: 20px; }}
+            h2 {{ color: #1e3c72; border-bottom: 2px solid #eef2f7; padding-bottom: 8px; margin-top: 35px; font-size: 20px; }}
+            h3 {{ color: #2a5298; font-size: 16px; margin-top: 20px; }}
             h4 {{ font-size: 15px; margin-top: 15px; text-align: center; }}
             .meta-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; background: #f4f7f6; padding: 20px; border-radius: 8px; }}
             .meta-item {{ font-size: 14px; }}
@@ -923,7 +923,7 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
             <div style="background-color:#f0fdf4; border-left:6px solid #16a34a; padding:20px; border-radius:8px; margin-bottom:30px; color: #1e293b; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
                 <h3 style="color:#14532d; margin-top:0;">🌿 Botanical Identity: {ayur_row.get('Herb / Tree Name', '')} (<i>{ayur_row.get('Scientific Name', '')}</i>)</h3>
                 <p><b>Family:</b> {ayur_row.get('Family', '')} | <b>Active Phytochemical:</b> {ayur_row.get('Phytochemical', '')}</p>
-                <p><b>Medicinal Activity:</b> {ayur_row.get('Medicinal Activity', '')} | <b>Protein Target:</b> {ayur_row.get('Target Protein / Receptor Name', '')} (PDB: {ayur_row.get('PDB ID', '')})</p>
+                <p><b>Medicinal Activity:</b> {ayur_row.get('Medicinal Activity', '')} | <b>Protein Target:</b> {ayur_row.get('Target Protein / Receptor Name', '')}</p>
                 <hr style="border: 0; height: 1px; background: #bbf7d0; margin: 15px 0;">
                 <p style="font-size:16px; color:#064e3b; font-style:italic;"><b>Sanskrit Shloka:</b> {ayur_row.get('Sanskrit Shloka (Bhavaprakasha Nighantu)', '')}</p>
                 <p style="font-size:13px; color:#0f766e;"><b>Transliteration:</b> {ayur_row.get('Roman Transliteration', '')}</p>
@@ -1142,7 +1142,7 @@ col_params, col_visual = st.columns([1, 1])
 trigger_rerun = False
 
 with col_params:
-    st.subheader("1. Ayurvedic Database Integration")
+    st.subheader("1. Ayurvedic Database Lookup")
     df_ayur = load_ayurvedic_db()
     
     # Dual Filter Logic 
@@ -1167,48 +1167,41 @@ with col_params:
     st.session_state.ayur_row = row.to_dict()
 
     # Enhanced Highlight Matrix for Ayurvedic Info
+    st.markdown("### 🌿 Ayurvedic Reference Card")
     st.markdown(f"""
     <div style="background-color:#f8fafc; border-left:6px solid #16a34a; padding:15px; border-radius:8px; margin-bottom:10px; color: #1e293b; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-        <h3 style="color:#14532d; margin-top:0;">🌿 Botanical Identity: {row['Herb / Tree Name']} (<i>{row['Scientific Name']}</i>)</h3>
+        <h3 style="color:#14532d; margin-top:0;">{row['Herb / Tree Name']} (<i>{row['Scientific Name']}</i>)</h3>
         <p style="color:#334155; margin-bottom:4px;"><b>Family:</b> {row['Family']} | <b>Active Phytochemical:</b> {row['Phytochemical']}</p>
-        <p style="color:#334155; margin-top:0;"><b>Medicinal Activity:</b> {row['Medicinal Activity']} | <b>Protein Target:</b> {row['Target Protein / Receptor Name']} (PDB: {row['PDB ID']})</p>
+        <p style="color:#334155; margin-top:0;"><b>Medicinal Activity:</b> {row['Medicinal Activity']} | <b>Protein Target:</b> {row['Target Protein / Receptor Name']}</p>
         <hr style="border: 0; height: 1px; background: #cbd5e1; margin: 12px 0;">
         <p style="font-size:16px; color:#064e3b; font-style:italic; margin-bottom:4px;"><b>Sanskrit Shloka:</b> {row['Sanskrit Shloka (Bhavaprakasha Nighantu)']}</p>
         <p style="font-size:13px; color:#0f766e; margin-top:0;"><b>Transliteration:</b> {row['Roman Transliteration']}</p>
-        <p style="color:#334155; margin-bottom:0; padding-top:8px; border-top:1px dashed #cbd5e1;"><b>Dravyaguna Profile:</b> {row['Dravyaguna Profile (Rasa/Virya/Vipaka)']} | <b>Classical Action:</b> {row['Classical Karma (Action)']}</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown("**📋 Target Parameters (Copy & Paste below):**")
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        st.caption("PDB ID:")
+        st.code(row['PDB ID'], language='text')
+    with col_c2:
+        st.caption("SMILES String:")
+        st.code(row['Canonical SMILES'], language='text')
 
-    # --- ADVANCED STRUCTURAL PREP LOGIC ---
-    pdb_id = str(row['PDB ID']).strip()
+    st.write("---")
+    st.subheader("2. Manual Configuration Workspace")
+    st.info("Copy the PDB ID and SMILES from the card above and paste them here to begin.")
     
-    # 1. We must fetch the PDB *before* they click the final load button to see the cofactors
-    if st.session_state.pdb_id_display != pdb_id.upper() or st.session_state.local_target_path is None:
-        with st.spinner("Syncing with RCSB PDB for structural data..."):
-            success, path = fetch_pdb_from_rcsb(pdb_id)
-            if success:
-                st.session_state.local_target_path = path
-                st.session_state.pdb_id_display = pdb_id.upper()
-                st.session_state.protein_name = row['Target Protein / Receptor Name']
-                st.session_state.active_retained_ions = [] # reset
-                
-    st.markdown("### 2. Catalytic Cofactors & Heteroatom Filter")
-    st.markdown("*Select structurally active ions/cofactors to keep in the grid pocket framework. Unchecked entries (like crystallization buffer debris) will be stripped.*")
-    
-    if st.session_state.local_target_path:
-        ions_list = extract_hetatm_data(st.session_state.local_target_path)
-        if ions_list:
-            cols = st.columns(3)
-            current_selections = []
-            for i, ion in enumerate(ions_list):
-                with cols[i % 3]:
-                    label = f"{ion['res_name']} ({ion['chain']}:{ion['seq']})"
-                    if st.checkbox(label, value=False, key=f"ion_{ion['key']}"):
-                        current_selections.append(ion['key'])
-            st.session_state.active_retained_ions = current_selections
-        else:
-            st.info("No relevant non-water cofactors detected in this receptor matrix.")
-    
+    col_input1, col_input2 = st.columns(2)
+    with col_input1:
+        manual_pdb = st.text_input("Target Protein (PDB ID)", placeholder="Paste PDB ID here...")
+    with col_input2:
+        manual_smiles = st.text_input("Ligand (SMILES)", placeholder="Paste SMILES here...")
+
+    remove_cofactors = st.checkbox("Rebuild Matrix: Remove Co-factors & Water Molecules", value=True)
+    if remove_cofactors:
+        st.caption("*The receptor coordinate matrix will be rebuilt excluding non-standard residues to prevent steric clashes.*")
+
     with st.expander("ℹ️ What is UFF / MMFF94 Energy Minimization? (Ligand Preparation)"):
         st.markdown("""
         **Energy Minimization** is critical before docking. The raw 2D SMILES string from the database is computationally flat. 
@@ -1218,48 +1211,80 @@ with col_params:
         angles, and dihedral geometries of the phytochemical until it reaches a stable, low-energy conformation (local minimum). 
         This ensures that the docking algorithm evaluates the naturally occurring, relaxed state of the drug molecule.
         """)
-    
-    if st.button("📥 Rebuild Clean Receptor & Optimize Ligand Matrix", type="primary", use_container_width=True):
-        with st.spinner("Rebuilding Receptor Matrix & Performing UFF/MMFF94 Energy Minimization..."):
-            smiles_str = str(row['Canonical SMILES']).strip()
-            
-            # Re-convert PDB to PDBQT, passing the specific list of ions they want to KEEP
-            conv_ok, _ = convert_pdb_to_pdbqt(
-                st.session_state.local_target_path, 
-                "protein.pdbqt", 
-                is_ligand=False, 
-                retain_hetatms=st.session_state.active_retained_ions
-            )
-            st.session_state.target_ready = conv_ok
-            
-            ok, msg, pre_e, post_e = convert_smiles_to_pdbqt(smiles_str, "ligand.pdbqt")
-            if ok:
-                st.session_state.ligand_ready = True
-                st.session_state.smiles_cache = smiles_str
-                st.session_state.pre_uff_score = pre_e
-                st.session_state.post_uff_score = post_e
-                
-                iupac = get_iupac_name(smiles_str)
-                st.session_state.ligand_iupac = iupac
-                
-                with open("ligand.pdbqt", "r") as f: st.session_state.serialized_ligand_block = f.read()
-                st.session_state.ligand_summary_text = f"**Phytochemical:** {row['Phytochemical']} <br> **IUPAC Nomenclature:** {iupac} <br> **Target Activity:** {row['Medicinal Activity']}"
-            else:
-                st.error(f"SMILES Error: {msg}")
 
-            if st.session_state.target_ready and st.session_state.ligand_ready:
-                st.success("Target and Ligand successfully mounted! Ligand has been energetically minimized.")
-                trigger_rerun = True
+    if st.button("📥 Load Target & Optimize Ligand Workspace", type="primary", use_container_width=True):
+        if manual_pdb and manual_smiles:
+            with st.spinner("Fetching PDB & Optimizing Ligand Matrix..."):
+                # Protein fetching and cleaning
+                success, path = fetch_pdb_from_rcsb(manual_pdb)
+                if success:
+                    st.session_state.local_target_path = path
+                    st.session_state.pdb_id_display = manual_pdb.upper()
+                    st.session_state.active_retained_ions = [] 
+                    
+                    meta = extract_pdb_metadata(path, manual_pdb.upper())
+                    st.session_state.protein_name = meta["name"]
+                    
+                    conv_ok, _ = convert_pdb_to_pdbqt(path, "protein.pdbqt", remove_cofactors=remove_cofactors)
+                    st.session_state.target_ready = conv_ok
+                else:
+                    st.error(f"Failed to fetch PDB {manual_pdb} from RCSB.")
 
-    if st.session_state.target_ready and os.path.exists("ligand.pdbqt"): st.session_state.ligand_ready = True
-    
+                # Ligand fetching and UFF minimization
+                ok, msg, pre_e, post_e = convert_smiles_to_pdbqt(manual_smiles, "ligand.pdbqt")
+                if ok:
+                    st.session_state.ligand_ready = True
+                    st.session_state.smiles_cache = manual_smiles
+                    st.session_state.pre_uff_score = pre_e
+                    st.session_state.post_uff_score = post_e
+                    iupac = get_iupac_name(manual_smiles)
+                    st.session_state.ligand_iupac = iupac
+                    st.session_state.ligand_summary_text = f"**IUPAC Nomenclature:** {iupac}"
+                else:
+                    st.error(f"SMILES Error: {msg}")
+
+                if st.session_state.target_ready and st.session_state.ligand_ready:
+                    st.success("Target and Ligand successfully mounted! Ligand energetically minimized.")
+                    time.sleep(1)
+                    trigger_rerun = True
+        else:
+            st.warning("Please enter both a PDB ID and a SMILES string to proceed.")
+
+    # COFACTOR MANAGEMENT (Appears after successful load)
+    if st.session_state.target_ready and st.session_state.local_target_path:
+        st.markdown("### 3. Catalytic Cofactors Filter (Optional)")
+        ions_list = extract_hetatm_data(st.session_state.local_target_path)
+        if ions_list:
+            cols = st.columns(3)
+            current_selections = []
+            for i, ion in enumerate(ions_list):
+                with cols[i % 3]:
+                    label = f"{ion['res_name']} ({ion['chain']}:{ion['seq']})"
+                    if st.checkbox(label, value=(ion['key'] in st.session_state.active_retained_ions), key=f"ion_{ion['key']}"):
+                        current_selections.append(ion['key'])
+            
+            if st.button("🛠 Rebuild Receptor with Selected Cofactors"):
+                st.session_state.active_retained_ions = current_selections
+                conv_ok, _ = convert_pdb_to_pdbqt(
+                    st.session_state.local_target_path, 
+                    "protein.pdbqt", 
+                    is_ligand=False, 
+                    retain_hetatms=current_selections
+                )
+                if conv_ok:
+                    st.success("Receptor matrix successfully rebuilt!")
+                    trigger_rerun = True
+        else:
+            st.info("No relevant non-water cofactors detected in this receptor matrix.")
+
+    # LIGAND SUMMARY
     if st.session_state.ligand_ready: 
         st.markdown(f"> **Ligand Metric Summary Profile:** \n> <br>{st.session_state.ligand_summary_text}", unsafe_allow_html=True)
         if st.session_state.pre_uff_score != 0.0:
             st.markdown(f"*Energy Drop via UFF/MMFF94:* `{st.session_state.pre_uff_score:.1f}` → `{st.session_state.post_uff_score:.1f} kcal/mol`")
 
     # --- CAVITY & BOUND SITE FINDER ---
-    st.subheader("3. Smart Cavity & Bound Site Finder")
+    st.subheader("4. Smart Cavity & Bound Site Finder")
     if st.session_state.target_ready and os.path.exists("protein.pdbqt"):
         if st.button("🔍 Scan Surface For Structural Cavities", use_container_width=True):
             with st.spinner("Analyzing macromolecular spatial curvature dynamics..."):
@@ -1290,7 +1315,7 @@ with col_params:
                 st.success("Grid parameters aligned over pocket boundaries!")
                 trigger_rerun = True
 
-    st.subheader("4. Search Space Mechanics (Grid Box)")
+    st.subheader("5. Search Space Mechanics (Grid Box)")
     
     if st.button("🌐 Enable Blind Docking (Full Protein Surface)", use_container_width=True):
         if st.session_state.target_ready and os.path.exists("protein.pdbqt"):
@@ -1316,7 +1341,7 @@ with col_params:
     run_btn = st.button("🚀 Initialize Docking Algorithm", type="primary", disabled=not can_dock)
 
 with col_visual:
-    st.header("5. Active Viewport Canvas")
+    st.header("6. Active Viewport Canvas")
     
     if st.session_state.docking_results_raw is None:
         view_tabs = st.tabs(["3D Structural Space", "2D Schematic Topology View"])
@@ -1603,53 +1628,64 @@ st.write("---")
 st.write("---")
 st.header("🧬 Phase 2: Generative Scaffold Structural Redesign Studio")
 
-if not st.session_state.smiles_cache:
-    st.warning("⚠️ Access Gated: Load an Ayurvedic compound in Phase 1 to unlock the modification dashboard.")
+if not st.session_state.ligand_ready:
+    st.warning("⚠️ Access Gated: Provide a valid pure SMILES sequence or upload a molecular file and click 'Load Ligand Structure' in Phase 1 to unlock the modification dashboard.")
 else:
-    cls_lbl, _ = get_dynamic_fragments(st.session_state.smiles_cache)
-    st.info(f"🧬 **Automated AI Scaffold Family Classification Ident: `{cls_lbl}`**")
+    if not st.session_state.smiles_cache:
+        st.warning("⚠️ SMILES Extraction Missing: Your uploaded 3D file was docked successfully, but we could not safely extract its 2D SMILES matrix automatically. Please paste its SMILES string below to proceed with redesign.")
+        manual_smiles = st.text_input("Enter Ligand SMILES String for Scaffold Engine:").strip()
+        if st.button("Unlock Redesign Engine"):
+            if manual_smiles:
+                st.session_state.smiles_cache = manual_smiles
+                trigger_rerun = True
+            else:
+                st.error("Please provide a valid SMILES string.")
     
-    rec_id = st.session_state.pdb_id_display if st.session_state.pdb_id_display else "Local Structural Matrix"
-    st.markdown(f"> **Target Receptor Matrix (PDB ID):** `{rec_id}` <br> **Lead Drug Scaffold (SMILES):** `{st.session_state.smiles_cache}`", unsafe_allow_html=True)
-    st.markdown("*Scientific Execution Protocol: This module computationally redesigns the primary structural architecture of the parent drug via bioisosteric substitution. This aims to optimize steric fit and explicitly improve the thermodynamic binding affinity (ΔG) within the target receptor pocket.*")
-    
-    v_sites = find_valid_cleavage_sites(st.session_state.smiles_cache)
-    col_rd_p, col_rd_v = st.columns([1, 1])
-    
-    with col_rd_p:
-        rx_mode = st.radio(
-            "Select Optimization Processing Mode:", 
-            [
-                "MockFrag Sandbox (100% Error-Free) [Bypasses strict valency limits to guarantee a result without crashing the dashboard]", 
-                "Option B: True Structural Cleaving (Dynamic Research Mode) [Uses rigorous quantum graph-editing to break/form covalent bonds; may fail if valency is exceeded]"
-            ], 
-            key="rx_mode_choice"
-        )
-        toggle_lbl = st.toggle("Overlay Atom Index Identification Matrix Trackers", value=True)
+    if st.session_state.smiles_cache:
+        cls_lbl, _ = get_dynamic_fragments(st.session_state.smiles_cache)
+        st.info(f"🧬 **Automated AI Scaffold Family Classification Ident: `{cls_lbl}`**")
         
-        if "True Structural Cleaving" in rx_mode and v_sites:
-            opts = {s["label"]: s["index"] for s in v_sites}
-            sel_lbl = st.selectbox("Isolate legal targeted atom intersection for array modification:", options=list(opts.keys()))
-            tgt_atom_idx = opts[sel_lbl]
-        else:
-            tgt_atom_idx = 0
-            st.info("Sandbox Mode Active: System will formulate a safe co-crystal variation without breaking existing chemical bonds.")
+        rec_id = st.session_state.pdb_id_display if st.session_state.pdb_id_display else "Local Structural Matrix"
+        st.markdown(f"> **Target Receptor Matrix (PDB ID):** `{rec_id}` <br> **Lead Drug Scaffold (SMILES):** `{st.session_state.smiles_cache}`", unsafe_allow_html=True)
+        st.markdown("*Scientific Execution Protocol: This module computationally redesigns the primary structural architecture of the parent drug via bioisosteric substitution. This aims to optimize steric fit and explicitly improve the thermodynamic binding affinity (ΔG) within the target receptor pocket.*")
+        
+        v_sites = find_valid_cleavage_sites(st.session_state.smiles_cache)
+        col_rd_p, col_rd_v = st.columns([1, 1])
+        
+        with col_rd_p:
+            rx_mode = st.radio(
+                "Select Optimization Processing Mode:", 
+                [
+                    "MockFrag Sandbox (100% Error-Free) [Bypasses strict valency limits to guarantee a result without crashing the dashboard]", 
+                    "Option B: True Structural Cleaving (Dynamic Research Mode) [Uses rigorous quantum graph-editing to break/form covalent bonds; may fail if valency is exceeded]"
+                ], 
+                key="rx_mode_choice"
+            )
+            toggle_lbl = st.toggle("Overlay Atom Index Identification Matrix Trackers", value=True)
             
-        if st.button("🚀 Generate Optimized Derivative Structural Library", type="primary"):
-            with st.spinner("Processing bioisosteric structural transformation loops..."):
-                res = run_cleaving_engine(st.session_state.smiles_cache, tgt_atom_idx, rx_mode)
-                if res and len(res) > 0:
-                    st.session_state.rd_library = pd.DataFrame(res)
-                    st.success(f"Successfully synthesized {len(res)} modified entries tracking baseline affinity data.")
-                    trigger_rerun = True
-    
-    with col_rd_v:
-        b_img = generate_clean_2d_image(st.session_state.smiles_cache, include_labels=toggle_lbl, zoom_level=550)
-        if b_img: st.markdown(b_img, unsafe_allow_html=True)
+            if "True Structural Cleaving" in rx_mode and v_sites:
+                opts = {s["label"]: s["index"] for s in v_sites}
+                sel_lbl = st.selectbox("Isolate legal targeted atom intersection for array modification:", options=list(opts.keys()))
+                tgt_atom_idx = opts[sel_lbl]
+            else:
+                tgt_atom_idx = 0
+                st.info("Sandbox Mode Active: System will formulate a safe co-crystal variation without breaking existing chemical bonds.")
+                
+            if st.button("🚀 Generate Optimized Derivative Structural Library", type="primary"):
+                with st.spinner("Processing bioisosteric structural transformation loops..."):
+                    res = run_cleaving_engine(st.session_state.smiles_cache, tgt_atom_idx, rx_mode)
+                    if res and len(res) > 0:
+                        st.session_state.rd_library = pd.DataFrame(res)
+                        st.success(f"Successfully synthesized {len(res)} modified entries tracking baseline affinity data.")
+                        trigger_rerun = True
         
-    if st.session_state.rd_library is not None and not st.session_state.rd_library.empty:
-        st.subheader("Synthesized Structural Variant Optimization Array Data Track")
-        st.dataframe(st.session_state.rd_library[["Variant ID", "Fragment Added", "Redesigned SMILES", "Delta Score", "MW (g/mol)", "LogP"]], hide_index=True, use_container_width=True)
+        with col_rd_v:
+            b_img = generate_clean_2d_image(st.session_state.smiles_cache, include_labels=toggle_lbl, zoom_level=550)
+            if b_img: st.markdown(b_img, unsafe_allow_html=True)
+            
+        if st.session_state.rd_library is not None and not st.session_state.rd_library.empty:
+            st.subheader("Synthesized Structural Variant Optimization Array Data Track")
+            st.dataframe(st.session_state.rd_library[["Variant ID", "Fragment Added", "Redesigned SMILES", "Delta Score", "MW (g/mol)", "LogP"]], hide_index=True, use_container_width=True)
 
 # ---------------------------------------------------------------------
 # PHASE 3: ADMET PROFILING & AUTOMATED REPORT EXPERT INTERFACE
