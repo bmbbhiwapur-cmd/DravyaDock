@@ -63,12 +63,13 @@ def initialize_session_states():
         "selected_variant_id": None,
         "style_mode": "cartoon",
         "surf_toggle": False,
-        "active_retained_ions": "None",
+        "active_retained_ions": [],
         "uff_cache": {},
         "last_uploaded_protein": "",
         "last_uploaded_ligand": "",
         "detected_pockets": [],
-        "selected_native_ligand": "Manual Coordinate Assignment"
+        "selected_native_ligand": "Manual Coordinate Assignment",
+        "ayur_row": {}
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -82,174 +83,70 @@ def safe_rerun():
     except AttributeError:
         st.experimental_rerun()
 
-# =====================================================================
-# 2. BIOINFORMATICS STRUCTURAL CONVERTERS & PARSERS
-# =====================================================================
+# --- AYURVEDIC DATABASE LOADER (50 ENTRIES HARDCODED FOR STABILITY) ---
+@st.cache_data
+def load_ayurvedic_db():
+    hardcoded_data = [
+        {"Master ID": "M-001", "Herb / Tree Name": "Neem", "Scientific Name": "Azadirachta indica", "Family": "Meliaceae", "Phytochemical": "Nimbin", "Canonical SMILES": "CC(=O)OC1C(C2(CC3C(C24C1C(O4)C(=C)C(=O)OC)CC(C5(C3CC(O5)C6=COCO6)C)OC(=O)C)C)C", "Medicinal Activity": "Antibacterial", "Target Protein / Receptor Name": "Penicillin-Binding Protein 2a (PBP2a)", "PDB ID": "1VQQ", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "निम्बः शीतो लघुस्तिक्तो व्रणशोधनरोपणः। चक्षुष्यः कफपित्तघ्नः कुष्ठहृत् कृमिहृत्परः॥", "Roman Transliteration": "nimbaḥ śīto laghustikto vraṇaśodhanaropaṇaḥ | cakṣuṣyaḥ kaphapittaghnaḥ kuṣṭhahṛt kṛmihṛtparaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya; Virya: Shita; Vipaka: Katu", "Classical Karma (Action)": "Krimighna (Antimicrobial) Vrana-shodhana Kusthaha"},
+        {"Master ID": "M-002", "Herb / Tree Name": "Tulsi", "Scientific Name": "Ocimum sanctum", "Family": "Lamiaceae", "Phytochemical": "Eugenol", "Canonical SMILES": "COC1=C(C=CC(=C1)CC=C)O", "Medicinal Activity": "Antimicrobial", "Target Protein / Receptor Name": "Candida albicans Secreted Aspartyl Proteinase 1", "PDB ID": "1ZAP", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "तुलसी कटुका तिक्ता हृद्या उष्णा दाहपित्तकृत्। दीपनी कुष्ठकृच्छ्रास्त्रपार्श्वशूलविनाशिनी॥", "Roman Transliteration": "tulasī kaṭukā tiktā hṛdyā uṣṇā dāhapittakṛt | dīpanī kuṣṭhakṛcchrāstrapārśvaśūlavināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Krimighna Hridya (Cardioprotective) Dipana"},
+        {"Master ID": "M-003", "Herb / Tree Name": "Ashwagandha", "Scientific Name": "Withania somnifera", "Family": "Solanaceae", "Phytochemical": "Withaferin A", "Canonical SMILES": "CC1=C(C(=O)C2=C(C1O)C3CCC4C5CC6C(C5(CCC4(C3(C2)C)O)C)OC(=O)C6(C)O)C7=CC(=O)OC7", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "Heat Shock Protein 90 (Hsp90)", "PDB ID": "2YI5", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "अश्वगन्धा अनिलाश्लेष्मश्वित्रशोथक्षयापहा। बल्या रसायनी तिक्ता कषायोष्णा अतिशुक्रला॥", "Roman Transliteration": "aśvagandhā anilāśleṣmaśvitraśothakṣayāpahā | balyā rasāyanī tiktā kaṣāyoṣṇā atiśukralā ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya Madhura; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Rasayana (Rejuvenative) Balya Shothahara"},
+        {"Master ID": "M-004", "Herb / Tree Name": "Turmeric", "Scientific Name": "Curcuma longa", "Family": "Zingiberaceae", "Phytochemical": "Curcumin", "Canonical SMILES": "COC1=C(O)C=CC(=C1)/C=C/C(=O)CC(=O)/C=C/C2=CC(=C(OC)C=C2)O", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "Glycogen Synthase Kinase-3 beta (GSK-3β)", "PDB ID": "1Q5K", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "हरिद्रा कटुका तिक्ता रूक्षोष्णा कफपित्तनुत्। वर्ण्या त्वग्दोषमेहास्त्रशोथपाण्डुव्रणापहा॥", "Roman Transliteration": "haridrā kaṭukā tiktā rūkṣoṣṇā kaphapittanut | varṇyā tvagdoṣamehāstraśothapāṇḍuvraṇāpahā ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Vranahara (Wound Healing) Lekhaniya Mehahara"},
+        {"Master ID": "M-005", "Herb / Tree Name": "Giloy", "Scientific Name": "Tinospora cordifolia", "Family": "Menispermaceae", "Phytochemical": "Berberine", "Canonical SMILES": "COC1=C(C2=C(C=C1)C3=CN4CCC5=CC6=C(C=C5C4C3=C2)OCO6)OC", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "AMP-activated Protein Kinase (AMPK)", "PDB ID": "4CFE", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "गुडूची कटुका तिक्ता स्वादुपाका रसायनी। ज्वरकुष्ठप्रमेहार्शःकण्डूहृद्रोगवातनुत्॥", "Roman Transliteration": "guḍūcī kaṭukā tiktā svādupākā rasāyanī | jvarakuṣṭhapramehārśaḥkaṇḍūhṛdroghavātanut ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Rasayana Tridosashamana"},
+        {"Master ID": "M-006", "Herb / Tree Name": "Brahmi", "Scientific Name": "Bacopa monnieri", "Family": "Plantaginaceae", "Phytochemical": "Bacoside A", "Canonical SMILES": "CC1C(C(C(C(O1)OC2C(C(OC3CC4(C5CCC6C7(CCC(C(C7CCC6(C5CC(=O)C4(C3(C)C)C)C)(C)C)O)C)C)CO)O)O)O)O", "Medicinal Activity": "Neuroprotective", "Target Protein / Receptor Name": "Human Beta-Amyloid (1-42) fibrils", "PDB ID": "2BEG", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "ब्राह्मी हिमा सरा तिक्ता मतिमेधाकृता स्वर्या। आयुष्या रसायनी स्वर्या विस्मृतिभ्रमहापरा॥", "Roman Transliteration": "brāhmī himā sarā tiktā matimedhākṛtā svaryā | āyuṣyā rasāyanī svaryā vismṛtibramahāparā ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Medhya (Neuroprotective) Ayushya Vismrtihara"},
+        {"Master ID": "M-007", "Herb / Tree Name": "Arjuna", "Scientific Name": "Terminalia arjuna", "Family": "Combretaceae", "Phytochemical": "Arjunic Acid", "Canonical SMILES": "CC1CCC2(CCC3(C(=CCC4C3(CCC5C4(CCC(C5(C)C)O)C)C)C2C1O)C)C(=O)O", "Medicinal Activity": "Cardioprotective", "Target Protein / Receptor Name": "Human Angiotensin-Converting Enzyme (ACE)", "PDB ID": "1O86", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "ककुभोऽर्जुनः कीर्तितः स्याच्छीतलः कषायको। हृद्रोगक्षतक्षयविषप्रशमनोऽपि च॥", "Roman Transliteration": "kakubho'rjunaḥ kīrtitaḥ syācchītalaḥ kaṣāyako | hṛdroghakṣatakṣayaviṣapraśamano'pi ca ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya; Virya: Shita; Vipaka: Katu", "Classical Karma (Action)": "Hridya (Cardioprotective) Raktastambhana Kṣatahara"},
+        {"Master ID": "M-008", "Herb / Tree Name": "Sarpagandha", "Scientific Name": "Rauvolfia serpentina", "Family": "Apocynaceae", "Phytochemical": "Reserpine", "Canonical SMILES": "COC1=C(C=C2C(=C1)C3CC4C(CC3NC2C5CC(C(C(C5)C(=O)OC)OC(=O)C6=CC(=C(C(=C6)OC)OC)OC)O)C(=O)O)OC", "Medicinal Activity": "Antihpertensive", "Target Protein / Receptor Name": "Vesicular Monoamine Transporter 2 (VMAT2)", "PDB ID": "7VUT", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "सर्पगन्धा तु तिक्तोष्णा कटुका च कफापहा। निद्राप्रदा रक्तवातशमनी काममन्दिनी॥", "Roman Transliteration": "sarpagandhā tu tiktoṣṇā kaṭukā ca kaphāpahā | nidrāpradā raktavātaśamanī kāmamandinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Nidraprada (Sedative) Raktavata-shamana (Antihpertensive)"},
+        {"Master ID": "M-009", "Herb / Tree Name": "Vasaka", "Scientific Name": "Justicia adhatoda", "Family": "Acanthaceae", "Phytochemical": "Vasicine", "Canonical SMILES": "C1CC2=NC3=CC=CC=C3C4C2(C1)N=C(O4)C", "Medicinal Activity": "Bronchodilator", "Target Protein / Receptor Name": "Beta-2 Adrenergic Receptor", "PDB ID": "7DHI", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "वासको वासिका वासा भिषङ्माता च सिंहिका। वासा तिक्ता कषायोष्णा कफपित्तविनाशिनी॥", "Roman Transliteration": "vāsako vāsikā vāsā bhiṣaṅmātā ca siṃhikā | vāsā tiktā kaṣāyoṣṇā kaphapittavināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya; Virya: Shita; Vipaka: Katu", "Classical Karma (Action)": "Kashahara (Antitussive) Shwasahara (Bronchodilator)"},
+        {"Master ID": "M-010", "Herb / Tree Name": "Licorice (Mulethi)", "Scientific Name": "Glycyrrhiza glabra", "Family": "Fabaceae", "Phytochemical": "Glycyrrhizin", "Canonical SMILES": "CC1(C2CCC3(C(C2(CCC1(C(=O)O)C)O)C(=O)C=C4C3(CCC5(C4CC(C(C5)(C)C(=O)O)OC6C(C(C(C(O6)C(=O)O)O)O)OC7C(C(C(C(O7)C(=O)O)O)O)O)C)C)C)C", "Medicinal Activity": "Antiviral", "Target Protein / Receptor Name": "SARS-CoV-2 Main Protease (Mpro)", "PDB ID": "6LU7", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "यष्टीमधु रसं स्वादु सुशीलं बलवर्णकृत्। गुरु चक्षुष्यं वृष्यं च व्रणशोथविनाशनम्॥", "Roman Transliteration": "yaṣṭīmadhu rasaṃ svādu suśīlaṃ balavarṇakṛt | guru cakṣuṣyaṃ vṛṣyaṃ ca vraṇaśothavināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Madhura; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Vranashothahara Varnya Balya Jvarahara"},
+        {"Master ID": "M-011", "Herb / Tree Name": "Amla", "Scientific Name": "Phyllanthus emblica", "Family": "Phyllanthaceae", "Phytochemical": "Gallic Acid", "Canonical SMILES": "C1=C(C=C(C(=C1O)O)O)C(=O)O", "Medicinal Activity": "Antioxidant", "Target Protein / Receptor Name": "Human Peroxiredoxin 5", "PDB ID": "1HD2", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "वयःस्थापनां धात्रीफलमम्लं रसे स्मृतम्। परं कफहरं वृष्यं चक्षुष्यं च रसायनम्॥", "Roman Transliteration": "vayaḥsthāpanāṃ dhātrīphalamamlaṃ rase smṛtam | paraṃ kaphaharaṃ vṛṣyaṃ cakṣuṣyaṃ ca rasāyanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Amla Madhura Tikta Kasaya Katu; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Rasayana Vayasthapana (Anti-aging) Chakshushya"},
+        {"Master ID": "M-012", "Herb / Tree Name": "Garlic", "Scientific Name": "Allium sativum", "Family": "Amaryllidaceae", "Phytochemical": "Allicin", "Canonical SMILES": "C=CCSS(=O)CC=C", "Medicinal Activity": "Antibacterial", "Target Protein / Receptor Name": "Staphylococcus aureus Sortase A", "PDB ID": "2GLA", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "लशुनः कटुकोष्णश्च तीक्ष्णो वातकफापहः। रसायनः परं हृद्यः क्रिमिकुष्ठविनाशनः॥", "Roman Transliteration": "laśunaḥ kaṭukoṣṇaśca tīkṣṇo vātakaphāpahaḥ | rasāyanaḥ paraṃ hṛdyaḥ krimikuṣṭhavināśanaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Madhura Tikta Kasaya; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Krimighna Hridya Rasayana Kusthahara"},
+        {"Master ID": "M-013", "Herb / Tree Name": "Ginger", "Scientific Name": "Zingiber officinale", "Family": "Zingiberaceae", "Phytochemical": "6-Gingerol", "Canonical SMILES": "CCCCCC(CC(=O)CCC1=CC(=C(C=C1)O)OC)O", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "Cyclooxygenase-2 (COX-2)", "PDB ID": "1CX2", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "आर्द्रकं कटुकं दीपनं चोष्णं वातकफापहम्। शूलहृद्भेदनं हृद्यं विबन्धानाहनाशनम्॥", "Roman Transliteration": "ārdrakaṃ kaṭukaṃ dīpanaṃ coṣṇaṃ vātakaphāpaham | śūlahṛdbhedanaṃ hṛdyaṃ vibandhānāhanāśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Dipana (Digestive) Shoolahara Hridya"},
+        {"Master ID": "M-014", "Herb / Tree Name": "Black Pepper", "Scientific Name": "Piper nigrum", "Family": "Piperaceae", "Phytochemical": "Piperine", "Canonical SMILES": "C1CCN(CC1)C(=O)/C=C/C=C/C2=CC3=C(C=C2)OCO3", "Medicinal Activity": "Bioenhancer", "Target Protein / Receptor Name": "P-Glycoprotein", "PDB ID": "6I6H", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "मरिचं कटुकं तीक्ष्णं दीपनं कफवातजित्। उष्णं प्रसेकि क्रिमिहृच्छ्वासशूलविनाशनम्॥", "Roman Transliteration": "maricaṃ kaṭukaṃ tīkṣṇaṃ dīpanṃ kaphavātajit | uṣṇaṃ praseki krimihṛcchvāsaśūlavināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramathi (Bioenhancer) Dipana Krimihara Shwasahara"},
+        {"Master ID": "M-015", "Herb / Tree Name": "Shankhpushpi", "Scientific Name": "Convolvulus pluricaulis", "Family": "Convolvulaceae", "Phytochemical": "Scopoletin", "Canonical SMILES": "COC1=C(C=C2C(=C1)C=CC(=O)O2)O", "Medicinal Activity": "Anxiolytic", "Target Protein / Receptor Name": "GABA-A Receptor", "PDB ID": "6D1M", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "शङ्खपुष्पी सरा तिक्ता मेध्या मानसरोगहृत्। बल्या रसायनी चैव विस्मृतिभ्रमनाशिनी॥", "Roman Transliteration": "śaṅkhapuṣpī sarā tiktā medhyā mānasarogahṛt | balyā rasāyanī caiva vismṛtibramhanāśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Medhya Manasarogahara (Anxiolytic) Rasayana"},
+        {"Master ID": "M-016", "Herb / Tree Name": "Gotu Kola", "Scientific Name": "Centella asiatica", "Family": "Apiaceae", "Phytochemical": "Asiaticoside", "Canonical SMILES": "CC1CCC2(CCC3(C(=CCC4C3(CCC5C4(CCC(C5(C)C)O)C)C)C2C1O)C)C(=O)OC6C(C(C(C(O6)CO)O)O)O", "Medicinal Activity": "Wound Healing", "Target Protein / Receptor Name": "Collagenase", "PDB ID": "2Y6I", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "मण्डूकपर्णी हिमा तिक्ता मेध्या आयुष्या रसायनी। कषायोष्णा सरा स्वर्या कुष्ठमेहास्त्रकासजित्॥", "Roman Transliteration": "maṇḍūkaparṇī himā tiktā medhyā āyuṣyā rasāyanī | kaṣāyoṣṇā sarā svaryā kuṣṭhamehāstrakāsajit ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Vranaropana (Wound Healing) Medhya Rasayana"},
+        {"Master ID": "M-017", "Herb / Tree Name": "Guggul", "Scientific Name": "Commiphora mukul", "Family": "Burseraceae", "Phytochemical": "Guggulsterone E", "Canonical SMILES": "CC=C1CCC2C3CCC4=CC(=O)CCC4(C3CCC12C)C", "Medicinal Activity": "Hypolipidemic", "Target Protein / Receptor Name": "Farnesoid X Receptor (FXR)", "PDB ID": "1OSH", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "गुग्गुलुः कटुकस्तिक्तो वीर्योष्णः कफवातजित्। मेदोहरः परं व्रण्यः क्लेदमेहापहो लघुः॥", "Roman Transliteration": "gugguluḥ kaṭukastikto vīryoṣṇaḥ kaphavātajit | medoharaḥ paraṃ vraṇyaḥ kledamehāpaho laghuḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Kasaya; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Medohara (Hypolipidemic) Shothahara Lekhaniya"},
+        {"Master ID": "M-018", "Herb / Tree Name": "Shatavari", "Scientific Name": "Asparagus racemosus", "Family": "Asparagaceae", "Phytochemical": "Shatavarin IV", "Canonical SMILES": "CC1CCC2(C(O1)C(C3C2(CCC4C3CCC5C4(CCC(C5)OC6C(C(C(C(O6)CO)O)O)OC7C(C(C(C(O7)CO)O)O)O)C)C)O)C", "Medicinal Activity": "Immunomodulatory", "Target Protein / Receptor Name": "Human Progesterone Receptor", "PDB ID": "1A28", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "शतावरी हिमा तिक्ता रसे स्वादी रसायनी। स्तन्यदा बुद्धिदा बल्या चक्षुष्या कफवातजित्॥", "Roman Transliteration": "śatāvarī himā tiktā rase svādī rasāyanī | stanyadā buddhidā balyā cakṣuṣyā kaphavātajit ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Madhura Tikta; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Stanyada (Galactagogue) Balya Rasayana Ojovardhaka"},
+        {"Master ID": "M-019", "Herb / Tree Name": "Kalmegh", "Scientific Name": "Andrographis paniculata", "Family": "Acanthaceae", "Phytochemical": "Andrographolide", "Canonical SMILES": "CC1=C(C(=O)OC1C(C)C2CCC3(C2(CCC(C3=C)O)C)C)O", "Medicinal Activity": "Hepatoprotective", "Target Protein / Receptor Name": "Human Tumor Necrosis Factor Alpha", "PDB ID": "2TNF", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "कालमेघस्तु तिक्तोष्णः कफपित्तज्वरापहः। यकृतोत्तेजकः श्रेष्ठः क्रिमिकुष्ठविनाशनः॥", "Roman Transliteration": "kālameghastu tiktoṣṇaḥ kaphapittajvarāpahaḥ | yakṛtottejakaḥ śreṣṭhaḥ krimikuṣṭhavināśanaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Yakrut-uttejaka (Hepatoprotective) Jvarahara"},
+        {"Master ID": "M-020", "Herb / Tree Name": "Karela (Bitter Melon)", "Scientific Name": "Momordica charantia", "Family": "Cucurbitaceae", "Phytochemical": "Charantin", "Canonical SMILES": "CC1CCC2(C(O1)C(C3C2(CCC4C3CCC5C4(CCC(C5)OC6C(C(C(C(O6)CO)O)O)O)C)C)O)C", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "Insulin Receptor Tyrosine Kinase", "PDB ID": "1IRK", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "कारवेल्लं कदु तीक्ष्णं तिक्तं पाके कटु स्मृतम्। दीपनं भेदनं हन्ति प्रमेहकफपित्तकृत्॥", "Roman Transliteration": "kāravellaṃ kadu tīkṣṇaṃ tiktaṃ pāke kaṭu smṛtam | dīpanāṃ bhedanāṃ hanti pramehakaphapittakṛt ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Dipana Raktashodhaka"},
+        {"Master ID": "M-021", "Herb / Tree Name": "Moringa", "Scientific Name": "Moringa oleifera", "Family": "Moringaceae", "Phytochemical": "Quercetin", "Canonical SMILES": "C1=CC(=C(C=C1C2=C(C(=O)C3=C(O2)C=C(C=C3O)O)O)O)O", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "PI3K", "PDB ID": "4FA6", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "शिग्रुस्तीक्ष्णोष्णकटुकः कफवातशोथहृत्। क्रिमिकुष्ठव्रणघ्नश्च दीपनो भेदनो लघुः॥", "Roman Transliteration": "śigrustīkṣṇoṣṇakaṭukaḥ kaphavātaśothahṛt | krimikuṣṭhavraṇaghnaśca dīpano bhedano laghuḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Shothahara (Anti-inflammatory/Tumor) Krimighna Dipana"},
+        {"Master ID": "M-022", "Herb / Tree Name": "Cinnamon", "Scientific Name": "Cinnamomum verum", "Family": "Lauraceae", "Phytochemical": "Cinnamaldehyde", "Canonical SMILES": "C1=CC=C(C=C1)/C=C/C=O", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "PPAR-gamma", "PDB ID": "3DZY", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "त्वक्पत्रं लघु तीक्ष्णोष्णं कडु तिक्तं च रुच्यकम्। कफवातहरं कण्ठरुक्प्रमेहविनाशनम्॥", "Roman Transliteration": "tvakpatraṃ laghu tīkṣणोष्णं kaḍu tiktaṃ ca rucyakam | kaphavātaharaṃ kaṇṭharukpramehavināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Dipana Hridya"},
+        {"Master ID": "M-023", "Herb / Tree Name": "Haritaki", "Scientific Name": "Terminalia chebula", "Family": "Combretaceae", "Phytochemical": "Chebulinic Acid", "Canonical SMILES": "CC1C2C(C(C(O1)OC(=O)C3=CC(=C(C(=C3)O)O)O)OC(=O)C4=CC(=C(C(=C4)O)O)O)OC(=O)C5=CC(=C(C(=C5)O)O)O", "Medicinal Activity": "Antiviral", "Target Protein / Receptor Name": "Hepatitis C Virus NS3/4A Protease", "PDB ID": "4A92", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "हरीतकी मानुषीणां मातेव हितकारिणी। प्रमेहकुष्ठशोथार्शःकामलाक्रिमिनाशिनी॥", "Roman Transliteration": "harītakī mānuṣīṇāṃ māteva hitakāriṇī | pramehakuṣṭhaśothārśaḥkāmalākrimināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya Madhura Amla Katu Tikta; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Tridosahara Anulomana (Laxative) Krimighna"},
+        {"Master ID": "M-024", "Herb / Tree Name": "Baheda", "Scientific Name": "Terminalia bellirica", "Family": "Combretaceae", "Phytochemical": "Bellericanin", "Canonical SMILES": "C1=CC(=C(C=C1)O)C2=CC(=O)C3=C(O2)C=C(C(=C3O)O)O", "Medicinal Activity": "Antimicrobial", "Target Protein / Receptor Name": "Staphylococcus aureus Dihydrofolate Reductase", "PDB ID": "2W9S", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "बिभीतकं स्वादुपाकं कषायं कफपित्तनुत्। उष्णवीर्यं चक्षुष्यं केश्यं क्रिमिनाशनम्॥", "Roman Transliteration": "bibhītakaṃ svādupākaṃ kaṣāyaṃ kaphapittanut | uṣṇavīryaṃ cakṣuṣyaṃ keśyaṃ krimināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Krimighna Kanthya (Throat-soothing) Chakshushya"},
+        {"Master ID": "M-025", "Herb / Tree Name": "Bel", "Scientific Name": "Aegle marmelos", "Family": "Rutaceae", "Phytochemical": "Marmin", "Canonical SMILES": "CC(=CCOCCC1=CC=C2C(=C1)C=CC(=O)O2)C", "Medicinal Activity": "Gastroprotective", "Target Protein / Receptor Name": "H+/K+-ATPase (Proton Pump)", "PDB ID": "5YLV", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "बिल्वं कषायं मधुरं पाचकं दीपनं लघु। उष्णं कफवातहरं ग्राही विबन्धाध्माननाशनम्॥", "Roman Transliteration": "bilvaṃ kaṣāyaṃ madhuraṃ pācakaṃ dīpanaṃ laghu | uṣṇaṃ kaphavātaharaṃ grāhī vibandhādhmānanaśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Grahi (Gastroprotective) Dipana Pachana"},
+        {"Master ID": "M-026", "Herb / Tree Name": "Pippali", "Scientific Name": "Piper longum", "Family": "Piperaceae", "Phytochemical": "Piperlongumine", "Canonical SMILES": "C1CC(=O)NC(=O)C1/C=C/C2=CC(=C(C(=C2)OC)OC)OC", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "Human Glutathione S-Transferase P1", "PDB ID": "11GS", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "पिप्पली कटुका तिक्ता स्वादुपाका रसायनी। दीपनी श्वासकासघ्नी प्रमेहार्शःक्षयापहा॥", "Roman Transliteration": "pippalī kaṭukā tiktā svādupākā rasāyanī | dīpanī śvāsakāsaghnī pramehārśaḥkṣayāpahā ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu; Virya: Anushnasheeta; Vipaka: Madhura", "Classical Karma (Action)": "Rasayana Dipana Shwasahara Kasanut"},
+        {"Master ID": "M-027", "Herb / Tree Name": "Chitrak", "Scientific Name": "Plumbago zeylanica", "Family": "Plumbaginaceae", "Phytochemical": "Plumbagin", "Canonical SMILES": "CC1=CC(=O)C2=C(C1=O)C=CC(=C2)O", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "Human AKT1 Kinase", "PDB ID": "3O96", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "चित्रको वह्निसदृशः पाचकः दीपनो लघुः। कफवातहरो शोथार्शःकुष्ठक्रिमिनाशनः॥", "Roman Transliteration": "citrako vahnisadṛśaḥ pācakaḥ dīpano laghuḥ | kaphavātaharo śothārśaḥkuṣṭhakrimināśanaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Deepana Pachana Lekhaniya (Anti-proliferative)"},
+        {"Master ID": "M-028", "Herb / Tree Name": "Manjistha", "Scientific Name": "Rubia cordifolia", "Family": "Rubiaceae", "Phytochemical": "Alizarin", "Canonical SMILES": "C1=CC=C2C(=C1)C(=O)C3=C(O2)C=C(C(=C3O)O)O", "Medicinal Activity": "Antimicrobial", "Target Protein / Receptor Name": "Staphylococcus aureus Tyrosyl-tRNA Synthetase", "PDB ID": "1JIJ", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "मञ्जिष्ठा मधुरा तिक्ता कषायोष्णा विषाहरी। शोथत्वग्दोषमेहास्रकुष्ठकण्डूव्रणापहा॥", "Roman Transliteration": "mañjiṣṭhā madhurā tiktā kaṣāyoṣṇā viṣāharī | śothatvagdoṣamehāsrakuṣṭhakaṇḍūvraṇāpahā ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Raktashodhaka (Blood Purifier) Vranaropana Krimighna"},
+        {"Master ID": "M-029", "Herb / Tree Name": "Sadabahar", "Scientific Name": "Catharanthus roseus", "Family": "Apocynaceae", "Phytochemical": "Vincristine", "Canonical SMILES": "CCC1CC2CC(C3=C(CN(C2)C1)C4=CC=CC=C4N3)(C5=C(C=C6C(=C5)C7C8(CC9CC(C8N(C7=O)C)(C(C9)(C(=O)OC)O)CC)O)OC)C(=O)OC", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "Human Tubulin Beta Chain", "PDB ID": "4EB6", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "सदाबहारो मधुरस्तिक्तस्तु वरदः स्मृतः। रक्तप्रदरनाशाय ग्रन्थ्यर्बुदहरो मतः॥", "Roman Transliteration": "sadābahāro madhurastiktastu varadaḥ smṛtaḥ | raktapradaranāśāya granthyarbudaharo mataḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Arbudahara (Anticancer/Anti-tumor) Raktashodhaka"},
+        {"Master ID": "M-030", "Herb / Tree Name": "Senna", "Scientific Name": "Senna alexandrina", "Family": "Fabaceae", "Phytochemical": "Sennoside A", "Canonical SMILES": "C1=CC=C2C(=C1)C(=O)C3=C(C2=O)C(=CC(=C3)C(=O)O)C4C5=C(C(=O)C6=CC=CC=C6C5=O)C(=CC(=C4)C(=O)O)O", "Medicinal Activity": "Laxative", "Target Protein / Receptor Name": "Human Aquaporin-4", "PDB ID": "3GD8", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "मार्कण्डिका च कटुका तिक्तोष्णा भेदिनी लघुः। मलावष्टम्भशूलघ्नी यकृद्रोगविनाशिनी॥", "Roman Transliteration": "mārkaṇḍikā ca kaṭukā tiktoṣṇā bhedinī laghuḥ | malāvaṣṭambhaśūlaghnī yakṛdroghavināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Virechana (Laxative) Anulomana Malabhedini"},
+        {"Master ID": "M-031", "Herb / Tree Name": "Castor (Eranda)", "Scientific Name": "Ricinus communis", "Family": "Euphorbiaceae", "Phytochemical": "Ricinoleic Acid", "Canonical SMILES": "CCCCCCC(CC=CCCCCC(=O)O)O", "Medicinal Activity": "Laxative", "Target Protein / Receptor Name": "Prostaglandin EP3 Receptor", "PDB ID": "6M9T", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "एरण्डो मधुरोष्णश्च तीक्ष्णो विड्विबन्धहा। शूलशोथकफातङ्कवातघ्नो मेदहः परम्॥", "Roman Transliteration": "eraṇḍo madhuroṣṇaśca tīkṣṇo viḍvibandhahā | śūlaśothakaphātaṅkavātaghno medahaḥ param ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Madhura Katu Kasaya; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Virechana (Laxative) Shoolahara Vatahara"},
+        {"Master ID": "M-032", "Herb / Tree Name": "Karanja", "Scientific Name": "Millettia pinnata", "Family": "Fabaceae", "Phytochemical": "Karanjin", "Canonical SMILES": "CC1=C(C=C2C(=C1)C(=O)C3=C(O2)C=CC=C3)C4=CC=CC=C4", "Medicinal Activity": "Antimicrobial", "Target Protein / Receptor Name": "Escherichia coli DNA Gyrase A", "PDB ID": "1AB4", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "करञ्जः कटुकस्तिक्तो वीर्योष्णः कफवातजित्। व्रणशोधनकृच्चैव क्रिमिकुष्ठविनाशनः॥", "Roman Transliteration": "karañjaḥ kaṭukastikto vīryoṣṇaḥ kaphavātajit | vraṇaśodhanakṛccaiva krimikuṣṭhavināśanaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Krimighna (Antimicrobial) Vrana-shodhana Kusthahara"},
+        {"Master ID": "M-033", "Herb / Tree Name": "Bakuchi", "Scientific Name": "Psoralea corylifolia", "Family": "Fabaceae", "Phytochemical": "Bakuchiol", "Canonical SMILES": "CC(=CCCC(C)(C=C)C1=CC=C(C=C1)O)C", "Medicinal Activity": "Antimicrobial", "Target Protein / Receptor Name": "Streptococcus mutans Sortase A", "PDB ID": "3HQE", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "बाकुची मधुरा तिक्ता कटुपाका रसायनी। हन्ति कुष्ठं प्रमेहं च क्रिमिं केशा हिता च सा॥", "Roman Transliteration": "bākucī madhurā tiktā kaṭupākā rasāyanī | hanti kuṣṭhaṃ pramehaṃ ca krimiṃ keśā hitā ca sā ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Kusthaghna (Anti-leprotic/Skin-cure) Krimighna Rasayana"},
+        {"Master ID": "M-034", "Herb / Tree Name": "Methi (Fenugreek)", "Scientific Name": "Trigonella foenum-graecum", "Family": "Fabaceae", "Phytochemical": "Trigonelline", "Canonical SMILES": "C[N+]1=CC=CC=C1C(=O)[O-]", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "Glucose Transporter Type 4 (GLUT4)", "PDB ID": "4GJS", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "मेथिका कटुका तिक्ता वातघ्नी दीपिनी लघुः। ज्वरारुचिप्रमेहाणां नाशिनी पुष्टिका मता॥", "Roman Transliteration": "methikā kaṭukā tiktā vātaghnī dīpinī laghuḥ | jvarārucipramehāṇāṃ nāśinī puṣṭikā matā ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Vatahara Dipana"},
+        {"Master ID": "M-035", "Herb / Tree Name": "Gokhru", "Scientific Name": "Tribulus terrestris", "Family": "Zygophyllaceae", "Phytochemical": "Protodioscin", "Canonical SMILES": "CC1CCC2(C(O1)C(C3C2(CCC4C3CCC5C4(CCC(C5)OC6C(C(C(C(O6)CO)O)O)O)C)C)O)C", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "Human Androgen Receptor", "PDB ID": "1X4V", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "गोक्षुरः शीतलः स्वादुः बलकृद् बस्तिशोधनः। मधुरो दीपनश्चैव अश्मरीकृच्छ्रनाशनः॥", "Roman Transliteration": "gokṣuraḥ śītalaḥ svāduḥ balakṛd bastiśodhanaḥ | madhuro dīpanaścaiva aśmarīkṛcchrānāśanaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Madhura; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Mootrala (Diuretic) Bastishodhana Aśmarīhara"},
+        {"Master ID": "M-036", "Herb / Tree Name": "Bhringraj", "Scientific Name": "Eclipta prostrata", "Family": "Asteraceae", "Phytochemical": "Wedelolactone", "Canonical SMILES": "COC1=CC2=C(C=C1)C3=C(C(=O)O2)C4=C(C=C(C=C4O3)O)O", "Medicinal Activity": "Hepatoprotective", "Target Protein / Receptor Name": "Human Caspase-8", "PDB ID": "1QTN", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "भृङ्गराजः कटुस्तिक्त रूक्षोष्णः कफवातनुत्। केश्यस्त्वच्यो कृमिघ्नश्च यकृद्रोगविनाशनः॥", "Roman Transliteration": "bhṛṅgarājaḥ kaṭustikta rūkṣoṣṇaḥ kaphavātanut | keśyastvacyo krimighnaśca yakṛdroghavināśanaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Keshya (Hair Growth) Yakrut-protective Kusthaghna"},
+        {"Master ID": "M-037", "Herb / Tree Name": "Punarnava", "Scientific Name": "Boerhavia diffusa", "Family": "Nyctaginaceae", "Phytochemical": "Punarnavine", "Canonical SMILES": "CNC1CCC2=C(C1)C=CC=C2", "Medicinal Activity": "Diuretic / Renal", "Target Protein / Receptor Name": "Human Adenosine A1 Receptor", "PDB ID": "5UEN", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "पुनर्नवा भवेदुष्णा तिक्ता च मधुरा रसे। शोथघ्नी मूत्रला चैव बस्तिरोगविनाशिनी॥", "Roman Transliteration": "punarnavā bhaveduṣṇā tiktā ca madhurā rase | śothaghnī mūtralā caiva bastiroghavināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Madhura Tikta Kasaya; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Mootrala (Diuretic) Shothahara (Anti-edema)"},
+        {"Master ID": "M-038", "Herb / Tree Name": "Safed Musli", "Scientific Name": "Chlorophytum borivilianum", "Family": "Asparagaceae", "Phytochemical": "Boriviloside A", "Canonical SMILES": "CC1C(C(C(C(O1)OC2C(C(OC3CC4C(C)C5CCC6C(C)C(=O)CC6C5CC4C3)CO)O)O)O)O", "Medicinal Activity": "Adaptogenic", "Target Protein / Receptor Name": "Human Corticotropin-Releasing Factor Receptor 1", "PDB ID": "4K5Y", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "मुशली मधुरा वृष्या वीर्योष्णा कफनाशनी। बल्या रसायनी चैव पुष्टिका धातुवर्धिनी॥", "Roman Transliteration": "muśalī madhurā vṛṣyā vīryoṣṇā kaphanāśanī | balyā rasāyanī caiva puṣṭikā dhātuvardhinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Madhura; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Vrishya (Aphrodisiac) Balya Dhātu-Rasayana"},
+        {"Master ID": "M-039", "Herb / Tree Name": "Tulsi", "Scientific Name": "Ocimum sanctum", "Family": "Lamiaceae", "Phytochemical": "Ursolic Acid", "Canonical SMILES": "CC1CCC2(CCC3(C(=CCC4C3(CCC5C4(CCC(C5(C)C)O)C)C)C2C1O)C)C(=O)O", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "Matrix Metalloproteinase-9 (MMP-9)", "PDB ID": "1L6J", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "तुलसी कटुका तिक्ता हृद्या उष्णा दाहपित्तकृत्। दीपनी कुष्ठकृच्छ्रास्त्रपार्श्वशूलविनाशिनी॥", "Roman Transliteration": "tulasī kaṭukā tiktā hṛdyā uṣṇā dāhapittakṛt | dīpanī kuṣṭhakṛcchrāstrapārśvaśūlavināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Krimighna Hridya (Cardioprotective) Dipana"},
+        {"Master ID": "M-040", "Herb / Tree Name": "Neem", "Scientific Name": "Azadirachta indica", "Family": "Meliaceae", "Phytochemical": "Azadirachtin", "Canonical SMILES": "CC1=CC23C(C(C4(C(O2)C5(C3(C(C1(O)C(=O)OC)O)O)CC(O5)(C(=O)OC)C6=CC=CO6)O)OC(=O)C)OC(=O)/C(=C/C)/C", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "Human Topoisomerase II alpha", "PDB ID": "1ZXM", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "निम्बः शीतो लघुस्तिक्तो व्रणशोधनरोपणः। चक्षुष्यः कफपित्तघ्नः कुष्ठहृत् कृमिहृत्परः॥", "Roman Transliteration": "nimbaḥ śīto laghustikto vraṇaśodhanaropaṇaḥ | cakṣuṣyaḥ kaphapittaghnaḥ kuṣṭhahṛt kṛmihṛtparaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya; Virya: Shita; Vipaka: Katu", "Classical Karma (Action)": "Krimighna (Antimicrobial) Vrana-shodhana Kusthaha"},
+        {"Master ID": "M-041", "Herb / Tree Name": "Ashwagandha", "Scientific Name": "Withania somnifera", "Family": "Solanaceae", "Phytochemical": "Withanone", "Canonical SMILES": "CC1=C(C(=O)C2=C(C1O)C3CCC4C5CC6C(C5(CCC4(C3(C2)C)O)C)OC(=O)C6(C)O)C7CC(=O)OC7", "Medicinal Activity": "Neuroprotective", "Target Protein / Receptor Name": "Acetylcholinesterase (AChE)", "PDB ID": "4EY7", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "अश्वगन्धा अनिलाश्लेष्मश्वित्रशोथक्षयापहा। बल्या रसायनी तिक्ता कषायोष्णा अतिशुक्रला॥", "Roman Transliteration": "aśvagandhā anilāśleṣmaśvitraśothakṣayāpahā | balyā rasāyanī tiktā kaṣāyoṣṇā atiśukralā ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya Madhura; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Rasayana (Rejuvenative) Balya Shothahara"},
+        {"Master ID": "M-042", "Herb / Tree Name": "Amla", "Scientific Name": "Phyllanthus emblica", "Family": "Phyllanthaceae", "Phytochemical": "Ellagic Acid", "Canonical SMILES": "C1=C2C3=C(C(=C1)O)OC(=O)C4=CC(=C(C(=C43)OC2=O)O)O", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "Protein Kinase CK2 alpha subunit", "PDB ID": "3BOW", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "वयःस्थापनां धात्रीफलमम्लं रसे स्मृतम्। परं कफहरं वृष्यं चक्षुष्यं च रसायनम्॥", "Roman Transliteration": "vayaḥsthāpanāṃ dhātrīphalamamlaṃ rase smṛtam | paraṃ kaphaharaṃ vṛṣyaṃ cakṣuṣyaṃ ca rasāyanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Amla Madhura Tikta Kasaya Katu; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Rasayana Vayasthapana (Anti-aging) Chakshushya"},
+        {"Master ID": "M-043", "Herb / Tree Name": "Giloy", "Scientific Name": "Tinospora cordifolia", "Family": "Menispermaceae", "Phytochemical": "Tinosporaside", "Canonical SMILES": "CC1=CC2=C(C(=O)O1)C3C(C4C2(CCC4(C)O)O)C5(C3CC(O5)C6=COC=C6)C", "Medicinal Activity": "Immunomodulatory", "Target Protein / Receptor Name": "Interleukin-6 (IL-6)", "PDB ID": "1ALU", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "गुडूची कटुका तिक्ता स्वादुपाका रसायनी। ज्वरकुष्ठप्रमेहार्शःकण्डूहृद्रोगवातनुत्॥", "Roman Transliteration": "guḍūcī kaṭukā tiktā svādupākā rasāyanī | jvarakuṣṭhapramehārśaḥkaṇḍūhṛdroghavātanut ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Rasayana Tridosashamana"},
+        {"Master ID": "M-044", "Herb / Tree Name": "Ginger", "Scientific Name": "Zingiber officinale", "Family": "Zingiberaceae", "Phytochemical": "6-Shogaol", "Canonical SMILES": "CCCCCC=CC(=O)CCC1=CC(=C(C=C1)O)OC", "Medicinal Activity": "Anti-inflammatory", "Target Protein / Receptor Name": "Human TNF-alpha", "PDB ID": "2AZA", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "आर्द्रकं कटुकं दीपनं चोष्णं वातकफापहम्। शूलहृद्भेदनं हृद्यं विबन्धानाहनाशनम्॥", "Roman Transliteration": "ārdrakaṃ kaṭukaṃ dīpanaṃ coṣṇaṃ vātakaphāpaham | śūlahṛdbhedanaṃ hṛdyaṃ vibandhānāhanāśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Dipana (Digestive) Shoolahara Hridya"},
+        {"Master ID": "M-045", "Herb / Tree Name": "Cinnamon", "Scientific Name": "Cinnamomum verum", "Family": "Lauraceae", "Phytochemical": "Cinnamic Acid", "Canonical SMILES": "C1=CC=C(C=C1)/C=C/C(=O)O", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "Protein Tyrosine Phosphatase 1B (PTP1B)", "PDB ID": "1XBO", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "त्वक्पत्रं लघु तीक्ष्णोष्णं कडु तिक्तं च रुच्यकम्। कफवातहरं कण्ठरुक्प्रमेहविनाशनम्॥", "Roman Transliteration": "tvakpatraṃ laghu tīkṣणोष्णं kaḍu tiktaṃ ca rucyakam | kaphavātaharaṃ kaṇṭharukpramehavināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Dipana Hridya"},
+        {"Master ID": "M-046", "Herb / Tree Name": "Arjuna", "Scientific Name": "Terminalia arjuna", "Family": "Combretaceae", "Phytochemical": "Arjunolic Acid", "Canonical SMILES": "CC1CCC2(CCC3(C(=CCC4C3(CCC5C4(CCC(C5(C)C)O)O)C)C2C1O)C)C(=O)O", "Medicinal Activity": "Cardioprotective", "Target Protein / Receptor Name": "Beta-1 Adrenergic Receptor", "PDB ID": "7JVP", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "ककुभोऽर्जुनः कीर्तितः स्याच्छीतलः कषायको। हृद्रोगक्षतक्षयविषप्रशमनोऽपि च॥", "Roman Transliteration": "kakubho'rjunaḥ kīrtitaḥ syācchītalaḥ kaṣāyako | hṛdroghakṣatakṣayaviṣapraśamano'pi ca ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya; Virya: Shita; Vipaka: Katu", "Classical Karma (Action)": "Hridya (Cardioprotective) Raktastambhana Kṣatahara"},
+        {"Master ID": "M-047", "Herb / Tree Name": "Licorice (Mulethi)", "Scientific Name": "Glycyrrhiza glabra", "Family": "Fabaceae", "Phytochemical": "Liquiritigenin", "Canonical SMILES": "C1CC(=O)C2=C(C=C(C=C2O1)O)C3=CC=C(C=C3)O", "Medicinal Activity": "Estrogenic", "Target Protein / Receptor Name": "Estrogen Receptor Beta (ER-β)", "PDB ID": "1QKM", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "यष्टीमधु रसं स्वादु सुशीलं बलवर्णकृत्। गुरु चक्षुष्यं वृष्यं च व्रणशोथविनाशनम्॥", "Roman Transliteration": "yaṣṭīmadhu rasaṃ svādu suśīlaṃ balavarṇakṛt | guru cakṣuष्यं वृष्यं च व्रणशोथविनाशनम्॥", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Madhura; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Vranashothahara Varnya Balya Jvarahara"},
+        {"Master ID": "M-048", "Herb / Tree Name": "Guggul", "Scientific Name": "Commiphora mukul", "Family": "Burseraceae", "Phytochemical": "Guggulsterone Z", "Canonical SMILES": "CC=C1CCC2C3CCC4=CC(=O)CCC4(C3CCC12C)C", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "NF-kB p50/p65 Heterodimer", "PDB ID": "1VKX", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "गुग्गुलुः कटुकस्तिक्तो वीर्योष्णः कफवातजित्। मेदोहरः परं व्रण्यः क्लेदमेहापहो लघुः॥", "Roman Transliteration": "gugguluḥ kaṭukastikto vīryoṣṇaḥ kaphavātajit | medoharaḥ paraṃ vraṇyaḥ kledamehāpaho लघुः॥", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Kasaya; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Medohara (Hypolipidemic) Shothahara Lekhaniya"},
+        {"Master ID": "M-049", "Herb / Tree Name": "Sarpagandha", "Scientific Name": "Rauvolfia serpentina", "Family": "Apocynaceae", "Phytochemical": "Ajmaline", "Canonical SMILES": "CC1=CC2C3CC4C5C(C3(CN2C1)O)NC6=CC=CC=C56", "Medicinal Activity": "Antiarrhythmic", "Target Protein / Receptor Name": "Human Voltage-Gated Sodium Channel Nav1.5", "PDB ID": "6UZ3", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "सर्पगन्धा तु तिक्तोष्णा कटुका च कफापहा। निद्राप्रदा रक्तवातशमनी काममन्दिनी॥", "Roman Transliteration": "sarpagandhā tu tiktoṣṇā kaṭukā ca kaphāpahā | nidrāpradā raktavātaśamanī kāmamandinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Nidraprada (Sedative) Raktavata-shamana (Antihpertensive)"},
+        {"Master ID": "M-050", "Herb / Tree Name": "Vasaka", "Scientific Name": "Justicia adhatoda", "Family": "Acanthaceae", "Phytochemical": "Vasicinone", "Canonical SMILES": "C1CC2=NC3=CC=CC=C3C(=O)C4C2(C1)N=C(O4)C", "Medicinal Activity": "Mucolytic", "Target Protein / Receptor Name": "Human Muscarinic Acetylcholine Receptor M3", "PDB ID": "4DA4", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "वासको वासिका वासा भिषङ्माता च सिंहिका। वासा तिक्ता कषायोष्णा कफपित्तविनाशिनी॥", "Roman Transliteration": "vāsako vāsikā vāsā bhiṣaṅmātā ca siṃhikā | vāsā tiktā kaṣāyoṣṇā kaphapittavināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya; Virya: Shita; Vipaka: Katu", "Classical Karma (Action)": "Kashahara (Antitussive) Shwasahara (Bronchodilator)"}
+    ]
+    return pd.DataFrame(hardcoded_data)
 
-def fetch_pdb_from_rcsb(pdb_id):
-    pdb_id = pdb_id.strip().lower()
-    url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
-    local_pdb = f"{pdb_id}.pdb"
+def get_iupac_name(smiles):
     try:
-        urllib.request.urlretrieve(url, local_pdb)
-        return True, local_pdb
-    except Exception:
-        return False, f"Could not find or download PDB ID '{pdb_id.upper()}'."
-
-def fetch_ligand_data_from_pubchem(smiles_string):
-    metadata = {"name": "Unknown Compound Name", "mw": "N/A", "formula": "N/A"}
-    try:
-        escaped_smiles = urllib.parse.quote(smiles_string)
-        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{escaped_smiles}/property/Title,MolecularWeight,MolecularFormula/JSON"
+        encoded_smiles = urllib.parse.quote(smiles, safe='')
+        url = f"https://cactus.nci.nih.gov/chemical/structure/{encoded_smiles}/iupac_name"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=8) as response:
-            res_data = json.loads(response.read().decode())
-            if "PropertyTable" in res_data and "Properties" in res_data["PropertyTable"]:
-                props = res_data["PropertyTable"]["Properties"][0]
-                metadata["name"] = props.get("Title", "Target Chemical Derivative")
-                metadata["mw"] = f"{props.get('MolecularWeight', 'N/A')} g/mol"
-                metadata["formula"] = props.get("MolecularFormula", "N/A")
-    except Exception: pass 
-    return metadata
-
-def extract_pdb_metadata(file_path, pdb_id="Custom"):
-    meta = {
-        "name": "Unknown Protein",
-        "title": "Uploaded Protein Structure Matrix", "id": pdb_id.upper() if pdb_id and pdb_id != "Uploaded File" else "Unknown",
-        "class": "Unknown Classification", "organism": "Unknown",
-        "system": "Unknown Expression System", "method": "X-RAY DIFFRACTION", "res": "N/A"
-    }
-    if not os.path.exists(file_path): return meta
-    try:
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-            title_parts = []
-            for line in f:
-                if line.startswith("TITLE"): title_parts.append(line[10:80].strip())
-                elif line.startswith("HEADER"): 
-                    meta["class"] = line[10:50].strip().title()
-                    if len(line) >= 66:
-                        possible_id = line[62:66].strip()
-                        if len(possible_id) == 4:
-                            meta["id"] = possible_id.upper()
-                elif line.startswith("COMPND"):
-                    if "MOLECULE:" in line:
-                        mol_name = line.split("MOLECULE:")[1].split(";")[0].strip()
-                        if meta["name"] == "Unknown Protein":
-                            meta["name"] = mol_name.title()
-                elif "ORGANISM_SCIENTIFIC" in line: meta["organism"] = line.split(":")[-1].replace(";","").strip()
-                elif "EXPRESSION_SYSTEM" in line: meta["system"] = line.split(":")[-1].replace(";","").strip()
-                elif line.startswith("EXPDTA"): meta["method"] = line[10:80].strip()
-                elif "RESOLUTION." in line and "ANGSTROMS." in line:
-                    match = re.search(r"(\d+\.\d+)", line)
-                    if match: meta["res"] = f"{match.group(1)} Å"
-        if title_parts: meta["title"] = " ".join(title_parts).title()
-        if meta["name"] == "Unknown Protein" and meta["title"] != "Uploaded Protein Structure Matrix":
-            meta["name"] = meta["title"]
-    except Exception: pass
-    return meta
-
-def discover_and_list_all_heteroatoms(file_path):
-    hetero_counts = {}
-    if not os.path.exists(file_path): return hetero_counts
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            if line.startswith("HETATM"):
-                res_name = line[17:20].strip()
-                if res_name in ["HOH", "WAT", "DOD"]: continue
-                hetero_counts[res_name] = hetero_counts.get(res_name, 0) + 1
-    return hetero_counts
-
-def parse_bound_ligands(file_path):
-    ligands = {}
-    if not os.path.exists(file_path): return []
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            if line.startswith("HETATM"):
-                res_name = line[17:20].strip()
-                chain_id = line[21].strip() if line[21].strip() else "A"
-                try: res_seq = int(line[22:26].strip())
-                except ValueError: continue
-                if res_name in ["HOH", "WAT", "DOD"]: continue
-                key = f"{res_name}-{chain_id}-{res_seq}"
-                try:
-                    x, y, z = float(line[30:38].strip()), float(line[38:46].strip()), float(line[46:54].strip())
-                except ValueError: continue
-                if key not in ligands:
-                    ligands[key] = {"res": res_name, "chain": chain_id, "seq": res_seq, "coords": []}
-                ligands[key]["coords"].append((x, y, z))
-                
-    processed_ligands = []
-    for key, info in ligands.items():
-        pts = info["coords"]
-        n_atoms = len(pts)
-        if n_atoms < 4: continue
-        cx, cy, cz = sum([p[0] for p in pts])/n_atoms, sum([p[1] for p in pts])/n_atoms, sum([p[2] for p in pts])/n_atoms
-        bx = max([p[0] for p in pts]) - min([p[0] for p in pts]) + 10.0
-        by = max([p[1] for p in pts]) - min([p[1] for p in pts]) + 10.0
-        bz = max([p[2] for p in pts]) - min([p[2] for p in pts]) + 10.0
-        processed_ligands.append({
-            "ID": info["res"], "Chain": info["chain"], "ResSeq": info["seq"], "Atoms": n_atoms,
-            "cx": round(cx, 2), "cy": round(cy, 2), "cz": round(cz, 2),
-            "bx": round(bx, 1), "by": round(by, 1), "bz": round(bz, 1)
-        })
-    return processed_ligands
-
-def identify_protein_cavities(pdbqt_file, max_pockets=5):
-    coords = []
-    if not os.path.exists(pdbqt_file): return []
-    with open(pdbqt_file, "r") as f:
-        for line in f:
-            if line.startswith(("ATOM", "HETATM")):
-                try:
-                    coords.append([float(line[30:38]), float(line[38:46]), float(line[46:54])])
-                except ValueError: continue
-    if len(coords) < 10: return []
-    arr = np.array(coords)
-    min_bound, max_bound = np.min(arr, axis=0), np.max(arr, axis=0)
-    step = (max_bound - min_bound) / 4.0
-    pockets, idx = [], 1
-    for i in range(1, 4):
-        for j in range(1, 4):
-            for k in range(1, 4):
-                pt = min_bound + np.array([i*step[0], j*step[1], k*step[2]])
-                dists = np.linalg.norm(arr - pt, axis=1)
-                score = np.sum((dists > 3.0) & (dists < 12.0))
-                core_clash = np.sum(dists <= 3.0)
-                if core_clash < 20 and score > 20:
-                    pockets.append({"Pocket_ID": f"Cavity {idx}", "cx": round(pt[0], 2), "cy": round(pt[1], 2), "cz": round(pt[2], 2), "bx": 20.0, "by": 20.0, "bz": 20.0, "Score": score})
-                    idx += 1
-    pockets = sorted(pockets, key=lambda x: x["Score"], reverse=True)
-    final_pockets = []
-    for p in pockets:
-        if not final_pockets: final_pockets.append(p)
-        else:
-            is_unique = True
-            for fp in final_pockets:
-                dist = np.linalg.norm(np.array([p["cx"], p["cy"], p["cz"]]) - np.array([fp["cx"], fp["cy"], fp["cz"]]))
-                if dist < 6.0: 
-                    is_unique = False; break
-            if is_unique: final_pockets.append(p)
-        if len(final_pockets) >= max_pockets: break
-    if not final_pockets:
-        center, dims = np.mean(arr, axis=0), max_bound - min_bound
-        final_pockets.append({"Pocket_ID": "Central Core Binding Site (Fallback)", "cx": round(center[0], 2), "cy": round(center[1], 2), "cz": round(center[2], 2), "bx": round(dims[0]*0.5, 2) + 5, "by": round(dims[1]*0.5, 2) + 5, "bz": round(dims[2]*0.5, 2) + 5, "Score": 100})
-    return final_pockets
-
-def compute_protein_bounding_box(pdbqt_file):
-    if not os.path.exists(pdbqt_file): return 0, 0, 0, 20, 20, 20
-    coords = []
-    with open(pdbqt_file, 'r') as f:
-        for line in f:
-            if line.startswith(("ATOM", "HETATM")):
-                try:
-                    coords.append((float(line[30:38].strip()), float(line[38:46].strip()), float(line[46:54].strip())))
-                except ValueError: pass
-    if not coords: return 0, 0, 0, 20, 20, 20
-    coords = np.array(coords)
-    min_c, max_c = coords.min(axis=0), coords.max(axis=0)
-    center = (min_c + max_c) / 2.0
-    size = (max_c - min_c) + 15.0
-    return center[0], center[1], center[2], size[0], size[1], size[2]
+        with urllib.request.urlopen(req, timeout=3) as response: return response.read().decode('utf-8')
+    except Exception: return "IUPAC translation unavailable (Network Timeout)"
 
 def convert_pdb_to_pdbqt(input_pdb, output_pdbqt="protein.pdbqt", is_ligand=False, allowed_heteroatoms=None):
     if allowed_heteroatoms is None: allowed_heteroatoms = []
@@ -302,6 +199,7 @@ def convert_pdb_to_pdbqt(input_pdb, output_pdbqt="protein.pdbqt", is_ligand=Fals
 
 def convert_smiles_to_pdbqt(smiles_string, output_filename="ligand.pdbqt"):
     try:
+        smiles_string = str(smiles_string).strip().replace('"', '').replace("'", "").replace('\n', '').replace('\r', '')
         mol = Chem.MolFromSmiles(smiles_string)
         if mol is None: return False, "Invalid SMILES."
         mol = Chem.AddHs(mol)
@@ -320,8 +218,6 @@ def convert_smiles_to_pdbqt(smiles_string, output_filename="ligand.pdbqt"):
         return ok, msg
     except Exception as e: return False, str(e)
 
-# --- NATIVE UFF ENERGY MINIMIZATION ENGINE ---
-
 def execute_uff_complex_minimization(protein_path, ligand_pose_str, progress_ui=None):
     try:
         protein_mol = Chem.MolFromPDBFile(protein_path, sanitize=False, removeHs=False)
@@ -337,7 +233,6 @@ def execute_uff_complex_minimization(protein_path, ligand_pose_str, progress_ui=
         
         pre_energy = uff_field.CalcEnergy()
         max_iter, chunk_size = 150, 15
-        
         if progress_ui: prog_bar = progress_ui.progress(0, text="⏳ Initializing UFF Force Field Physics Matrix...")
         
         res = 1
@@ -358,7 +253,6 @@ def execute_uff_complex_minimization(protein_path, ligand_pose_str, progress_ui=
     except Exception: return "N/A", "N/A", "N/A"
 
 def parse_pdbqt_coordinates(pdbqt_string):
-    """Robust parser that guarantees element extraction even if Vina strips the column."""
     atoms = []
     for line in pdbqt_string.split("\n"):
         if line.startswith(("ATOM", "HETATM")):
@@ -502,6 +396,29 @@ def get_dynamic_fragments(parent_smiles):
             {"name": "Fluorination (-F)", "smiles": "F", "peak": 1150, "yield": "Poor Yield (38%)", "route": "Late-stage electrophilic fluorination using Selectfluor."}
         ]
 
+def calculate_advanced_adme(smiles):
+    default_adme = {"MW": 0.0, "LogP": 0.0, "HBD": 0, "HBA": 0, "TPSA": 0.0, "Violations": 0, "Lipinski_Obey": "N/A", "Oral_Bio": "N/A", "MaxRing": 0, "Volume": 0.0, "pKa_Acid": "N/A", "pKa_Base": "N/A", "MP": 0.0, "BP": 0.0, "Permeability": "N/A", "BBB": False, "HIA": False}
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if not mol: return default_adme
+        mol = Chem.AddHs(mol)
+        mw, logp, hbd, hba, tpsa = Descriptors.MolWt(mol), Descriptors.MolLogP(mol), Descriptors.NumHDonors(mol), Descriptors.NumHAcceptors(mol), Descriptors.TPSA(mol)
+        violations = sum([mw > 500, logp > 5, hbd > 5, hba > 10])
+        lipinski_obey = "Yes" if violations <= 1 else "No"
+        oral_bio = "Yes (High)" if violations == 0 else ("Yes (Moderate)" if violations == 1 else "No (Poor)")
+        ring_info = mol.GetRingInfo().AtomRings()
+        max_ring = max([len(r) for r in ring_info]) if ring_info else 0
+        vol = float(mw) * 0.88 
+        acidic_pka = "Acidic (~4.5)" if mol.HasSubstructMatch(Chem.MolFromSmarts("C(=O)[OH]")) else ("Weak Acid (~9.5)" if mol.HasSubstructMatch(Chem.MolFromSmarts("c[OH]")) else "Neutral")
+        basic_pka = "Basic (~9.0)" if mol.HasSubstructMatch(Chem.MolFromSmarts("[NX3;H2,H1;!$(NC=O)]")) else ("Weak Base (~4.0)" if mol.HasSubstructMatch(Chem.MolFromSmarts("cN")) else "Neutral")
+        rot_bonds = Descriptors.NumRotatableBonds(mol)
+        est_mp = max(20.0, (mw * 0.4) + (hbd * 25.0) - (rot_bonds * 5.0))
+        est_bp = est_mp + 150.0 + (mw * 0.5)
+        hia, bbb = (tpsa < 132) and (-2.0 < logp < 6.0), (tpsa < 79) and (0.4 < logp < 6.0)
+        perm = "High BBB Penetration & GI Absorption" if bbb else ("Good GI Absorption" if hia else "Poor Absorption / Impermeable")
+        return {"MW": mw, "LogP": logp, "HBD": hbd, "HBA": hba, "TPSA": tpsa, "Violations": violations, "Lipinski_Obey": lipinski_obey, "Oral_Bio": oral_bio, "MaxRing": max_ring, "Volume": vol, "pKa_Acid": acidic_pka, "pKa_Base": basic_pka, "MP": est_mp, "BP": est_bp, "Permeability": perm, "BBB": bbb, "HIA": hia}
+    except Exception: return default_adme
+
 def run_cleaving_engine(parent_smiles, target_atom_idx, mechanism_mode):
     parent_mol = Chem.MolFromSmiles(parent_smiles)
     if not parent_mol: return []
@@ -551,37 +468,6 @@ def run_cleaving_engine(parent_smiles, target_atom_idx, mechanism_mode):
             "Route": route, "FTIR Peak": int(frag["peak"])
         })
     return derived_library
-
-def get_iupac_name(smiles):
-    try:
-        encoded_smiles = urllib.parse.quote(smiles, safe='')
-        url = f"https://cactus.nci.nih.gov/chemical/structure/{encoded_smiles}/iupac_name"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=3) as response: return response.read().decode('utf-8')
-    except Exception: return "IUPAC translation unavailable (Network Timeout)"
-
-def calculate_advanced_adme(smiles):
-    default_adme = {"MW": 0.0, "LogP": 0.0, "HBD": 0, "HBA": 0, "TPSA": 0.0, "Violations": 0, "Lipinski_Obey": "N/A", "Oral_Bio": "N/A", "MaxRing": 0, "Volume": 0.0, "pKa_Acid": "N/A", "pKa_Base": "N/A", "MP": 0.0, "BP": 0.0, "Permeability": "N/A", "BBB": False, "HIA": False}
-    try:
-        mol = Chem.MolFromSmiles(smiles)
-        if not mol: return default_adme
-        mol = Chem.AddHs(mol)
-        mw, logp, hbd, hba, tpsa = Descriptors.MolWt(mol), Descriptors.MolLogP(mol), Descriptors.NumHDonors(mol), Descriptors.NumHAcceptors(mol), Descriptors.TPSA(mol)
-        violations = sum([mw > 500, logp > 5, hbd > 5, hba > 10])
-        lipinski_obey = "Yes" if violations <= 1 else "No"
-        oral_bio = "Yes (High)" if violations == 0 else ("Yes (Moderate)" if violations == 1 else "No (Poor)")
-        ring_info = mol.GetRingInfo().AtomRings()
-        max_ring = max([len(r) for r in ring_info]) if ring_info else 0
-        vol = float(mw) * 0.88 
-        acidic_pka = "Acidic (~4.5)" if mol.HasSubstructMatch(Chem.MolFromSmarts("C(=O)[OH]")) else ("Weak Acid (~9.5)" if mol.HasSubstructMatch(Chem.MolFromSmarts("c[OH]")) else "Neutral")
-        basic_pka = "Basic (~9.0)" if mol.HasSubstructMatch(Chem.MolFromSmarts("[NX3;H2,H1;!$(NC=O)]")) else ("Weak Base (~4.0)" if mol.HasSubstructMatch(Chem.MolFromSmarts("cN")) else "Neutral")
-        rot_bonds = Descriptors.NumRotatableBonds(mol)
-        est_mp = max(20.0, (mw * 0.4) + (hbd * 25.0) - (rot_bonds * 5.0))
-        est_bp = est_mp + 150.0 + (mw * 0.5)
-        hia, bbb = (tpsa < 132) and (-2.0 < logp < 6.0), (tpsa < 79) and (0.4 < logp < 6.0)
-        perm = "High BBB Penetration & GI Absorption" if bbb else ("Good GI Absorption" if hia else "Poor Absorption / Impermeable")
-        return {"MW": mw, "LogP": logp, "HBD": hbd, "HBA": hba, "TPSA": tpsa, "Violations": violations, "Lipinski_Obey": lipinski_obey, "Oral_Bio": oral_bio, "MaxRing": max_ring, "Volume": vol, "pKa_Acid": acidic_pka, "pKa_Base": basic_pka, "MP": est_mp, "BP": est_bp, "Permeability": perm, "BBB": bbb, "HIA": hia}
-    except Exception: return default_adme
 
 # =====================================================================
 # 4. HIGH PERFORMANCE VISUALIZATION UTILITIES & HTML REPORTING
@@ -1122,7 +1008,7 @@ with col_params:
     </div>
     """, unsafe_allow_html=True)
     
-    st.info("📋 **Please copy the PDB ID and SMILES below and paste them into the inputs for step 1 and step 2.**")
+    st.info("📋 **Please copy the PDB ID and SMILES below and paste them into the Target Protein Setup and Small Molecule Ligand Setup inputs below.**")
     col_c1, col_c2 = st.columns(2)
     with col_c1:
         st.caption("PDB ID:")
@@ -1211,7 +1097,7 @@ with col_params:
     uploaded_lig_name = ""
 
     if ligand_source == "SMILES String Input":
-        smiles_input_val = st.text_input("Enter Ligand SMILES String", "CC(=O)NC1=CC=C(O)C=C1").strip()
+        smiles_input_val = st.text_input("Enter Ligand SMILES String", "CC(=O)NC1=CC=C(O)C=C1").strip().replace('"', '').replace("'", "").replace('\n', '').replace('\r', '')
     else:
         uploaded_lig_file = st.file_uploader("Upload Small Molecule File", type=["pdb", "sdf"])
         if uploaded_lig_file:
@@ -1234,6 +1120,7 @@ with col_params:
                             st.success("Ligand metadata mapped from PubChem!")
                             trigger_rerun = True
                         else: st.error(msg)
+                    else: st.error("SMILES Error: RDKit could not parse this SMILES string. Ensure there are no hidden spaces.")
                 except Exception as e: st.error(f"SMILES Parsing Failure: {e}")
                 
         elif ligand_source == "Upload Structural File (.pdb, .sdf)" and uploaded_lig_buffer is not None:
