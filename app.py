@@ -68,7 +68,20 @@ def initialize_session_states():
         "last_uploaded_protein": "",
         "last_uploaded_ligand": "",
         "detected_pockets": [],
-        "selected_native_ligand": "Manual Coordinate Assignment"
+        "selected_native_ligand": "Manual Coordinate Assignment",
+        # New Ayurvedic Database States
+        "is_ayur_loaded": False,
+        "ayur_tree_name": "",
+        "ayur_scientific": "",
+        "ayur_family": "",
+        "ayur_activity": "",
+        "ayur_shloka": "",
+        "ayur_shloka_trans": "",
+        "ayur_dravyaguna": "",
+        "ayur_karma": "",
+        "ayur_ligand": "",
+        "ayur_smiles": "",
+        "ayur_protein": ""
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -678,7 +691,7 @@ def render_advanced_modeling_blueprint(receptor_data, ligand_data, mode="cartoon
     """
     components.html(html_content, height=510)
 
-def build_phase1_html_report(meta, p_2d, smiles_cache, grid_params, df_results_p1, orig_ints, receptor_data, orig_ligand_pose_data, selected_pose_orig, style_mode, show_surface, pre_uff, post_uff, delta_uff, active_retained_ions, uff_theory_html, orig_matrix_html, grid_strategy):
+def build_phase1_html_report(meta, p_2d, smiles_cache, grid_params, df_results_p1, orig_ints, receptor_data, orig_ligand_pose_data, selected_pose_orig, style_mode, show_surface, pre_uff, post_uff, delta_uff, active_retained_ions, uff_theory_html, orig_matrix_html, grid_strategy, ayur_data=None):
     res_html = "<p>No docking data.</p>"
     if df_results_p1 is not None and not df_results_p1.empty:
         res_html = '<table class="dataframe table"><thead><tr>'
@@ -714,6 +727,23 @@ def build_phase1_html_report(meta, p_2d, smiles_cache, grid_params, df_results_p
     else: style_js = "viewer1.setStyle({model: 0}, {cartoon: {colorscheme: 'chain', style: 'oval', thickness: 0.6}});"
         
     surface_js = "viewer1.addSurface($3Dmol.SurfaceType.VDW, {opacity:0.45, colorscheme:{prop:'b',gradient:'rwb'}}, {model:0});" if show_surface else ""
+
+    ayur_html_block = ""
+    if ayur_data and ayur_data.get('is_loaded'):
+        ayur_html_block = f"""
+        <h2>🌿 Ayurvedic Dravyaguna Database Extraction</h2>
+        <div style="background: #fdfbfb; border-left: 6px solid #2e7d32; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <h3 style="color: #1b5e20; margin-top: 0; margin-bottom: 5px;">{ayur_data['tree_name']}</h3>
+            <h4 style="color: #4caf50; margin-top: 0; margin-bottom: 15px;"><i>{ayur_data['scientific']}</i> | Family: {ayur_data['family']}</h4>
+            <p><strong>Target Medicinal Activity:</strong> {ayur_data['activity']}</p>
+            <div style="background: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0; margin-bottom: 15px;">
+                <p style="font-size: 18px; color: #d32f2f; margin:0; font-weight:bold;">{ayur_data['shloka']}</p>
+                <p style="font-style: italic; color: #555; margin: 5px 0 0 0;">{ayur_data['shloka_trans']}</p>
+            </div>
+            <p><strong>Dravyaguna Profile:</strong> {ayur_data['dravyaguna']}</p>
+            <p><strong>Classical Karma:</strong> {ayur_data['karma']}</p>
+        </div>
+        """
     
     return f"""
     <!DOCTYPE html>
@@ -748,6 +778,7 @@ def build_phase1_html_report(meta, p_2d, smiles_cache, grid_params, df_results_p
         </div>
         
         <div class="container">
+            {ayur_html_block}
             <h2>1. Baseline Docking Configuration & Target Matrix</h2>
             <div class="meta-grid">
                 <div class="meta-item"><strong>Target Protein:</strong> {meta['name']}</div>
@@ -806,7 +837,7 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
                                     orig_ints, new_ints, receptor_data, orig_ligand_pose_data, redesign_ligand_pose_data, 
                                     selected_pose_orig, selected_pose_new, style_mode_orig, show_surface_orig,
                                     style_mode_new, show_surface_new, master_verdict, df_comparison_html, pre_uff, post_uff, delta_uff, active_retained_ions,
-                                    uff_theory_html, orig_matrix_html, new_matrix_html, grid_strategy):
+                                    uff_theory_html, orig_matrix_html, new_matrix_html, grid_strategy, ayur_data=None):
     
     def generate_html_table(df):
         if df is None or df.empty: return "<p>No docking data.</p>"
@@ -860,6 +891,23 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
         
     surface_js1 = "viewer1.addSurface($3Dmol.SurfaceType.VDW, {opacity:0.45, colorscheme:{prop:'b',gradient:'rwb'}}, {model:0});" if show_surface_orig else ""
     surface_js2 = "viewer2.addSurface($3Dmol.SurfaceType.VDW, {opacity:0.45, colorscheme:{prop:'b',gradient:'rwb'}}, {model:0});" if show_surface_new else ""
+
+    ayur_html_block = ""
+    if ayur_data and ayur_data.get('is_loaded'):
+        ayur_html_block = f"""
+        <h2>🌿 Ayurvedic Dravyaguna Database Extraction</h2>
+        <div style="background: #fdfbfb; border-left: 6px solid #2e7d32; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <h3 style="color: #1b5e20; margin-top: 0; margin-bottom: 5px;">{ayur_data['tree_name']}</h3>
+            <h4 style="color: #4caf50; margin-top: 0; margin-bottom: 15px;"><i>{ayur_data['scientific']}</i> | Family: {ayur_data['family']}</h4>
+            <p><strong>Target Medicinal Activity:</strong> {ayur_data['activity']}</p>
+            <div style="background: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0; margin-bottom: 15px;">
+                <p style="font-size: 18px; color: #d32f2f; margin:0; font-weight:bold;">{ayur_data['shloka']}</p>
+                <p style="font-style: italic; color: #555; margin: 5px 0 0 0;">{ayur_data['shloka_trans']}</p>
+            </div>
+            <p><strong>Dravyaguna Profile:</strong> {ayur_data['dravyaguna']}</p>
+            <p><strong>Classical Karma:</strong> {ayur_data['karma']}</p>
+        </div>
+        """
     
     return f"""
     <!DOCTYPE html>
@@ -901,6 +949,7 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
         </div>
         
         <div class="container">
+            {ayur_html_block}
             <h2>1. Baseline Docking Configuration & Target Matrix</h2>
             <div class="meta-grid">
                 <div class="meta-item"><strong>Target Protein Name:</strong> {meta['name']}</div>
@@ -1148,6 +1197,34 @@ if st.button("🔄 Reset Entire Environment", type="secondary", use_container_wi
     st.success("Dashboard cache and runtime structures completely cleared!")
     safe_rerun()
 
+# --- RESULT CARD RENDERING ---
+if st.session_state.get('is_ayur_loaded', False):
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%); border-left: 6px solid #2e7d32; border-radius: 8px; padding: 25px; margin-top: 15px; margin-bottom: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
+        <h2 style="color: #1b5e20; margin-top: 0; margin-bottom: 5px;">🌿 {st.session_state.ayur_tree_name}</h2>
+        <h4 style="color: #4caf50; margin-top: 0; margin-bottom: 15px;"><i>{st.session_state.ayur_scientific}</i> | Family: {st.session_state.ayur_family}</h4>
+        <div style="background: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0; margin-bottom: 15px;">
+            <p style="margin: 0; font-size: 16px;"><strong>Target Medicinal Activity:</strong> {st.session_state.ayur_activity}</p>
+            <hr style="border: none; border-top: 1px dashed #e0e0e0; margin: 12px 0;">
+            <p style="margin: 0; font-size: 18px; color: #d32f2f; font-weight: bold;">{st.session_state.ayur_shloka}</p>
+            <p style="margin: 5px 0 0 0; font-style: italic; color: #555;">Pronunciation / Transliteration: {st.session_state.ayur_shloka_trans}</p>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
+            <div style="flex: 1; background: #e8f5e9; padding: 12px; border-radius: 6px; border: 1px solid #c8e6c9;">
+                <strong>Dravyaguna Profile (Rasa/Virya/Vipaka):</strong><br>{st.session_state.ayur_dravyaguna}
+            </div>
+            <div style="flex: 1; background: #e8f5e9; padding: 12px; border-radius: 6px; border: 1px solid #c8e6c9;">
+                <strong>Classical Karma (Action):</strong><br>{st.session_state.ayur_karma}
+            </div>
+        </div>
+        <div style="background: #e3f2fd; padding: 15px; border-radius: 6px; border: 1px solid #bbdefb;">
+            <p style="margin: 0; font-size: 15px;"><strong>Target Protein:</strong> {st.session_state.ayur_protein}</p>
+            <p style="margin: 8px 0 0 0; font-size: 15px;"><strong>Active Phytochemical Ligand:</strong> {st.session_state.ayur_ligand} <br>
+            <span style="font-family: monospace; font-size: 13px; color: #0277bd;">{st.session_state.ayur_smiles}</span></p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 # ---------------------------------------------------------------------
 # SAFEGUARD FALLBACKS
 # ---------------------------------------------------------------------
@@ -1214,179 +1291,196 @@ with col_params:
                 
                 # Append Traditional Ayurvedic Data to the summary text
                 st.session_state.ligand_summary_text = (
-                    f"**Phytochemical Identifier:** {target_row['Phytochemical']} | **Formula:** {pub_data['formula']} | **MW:** {pub_data['mw']}\n\n"
-                    f"> **Dravyaguna Matrix (Ayurvedic Profile):**\n"
-                    f"> * **Shloka:** {target_row['Sanskrit Shloka (Bhavaprakasha Nighantu)']}\n"
-                    f"> * **Pharmacology:** {target_row['Dravyaguna Profile (Rasa/Virya/Vipaka)']}\n"
-                    f"> * **Classical Action:** {target_row['Classical Karma (Action)']}"
+                    f"**Phytochemical Identifier:** {target_row['Phytochemical']} | **Formula:** {pub_data['formula']} | **MW:** {pub_data['mw']}"
                 )
             else:
                 st.error(f"Ligand Conversion Error: {msg}")
 
+        # Store Ayurvedic details to render in the card later
         if st.session_state.target_ready and st.session_state.ligand_ready:
+            st.session_state.ayur_tree_name = target_row['Herb / Tree Name']
+            st.session_state.ayur_scientific = target_row['Scientific Name']
+            st.session_state.ayur_family = target_row['Family']
+            st.session_state.ayur_activity = target_row['Medicinal Activity']
+            st.session_state.ayur_shloka = target_row['Sanskrit Shloka (Bhavaprakasha Nighantu)']
+            st.session_state.ayur_shloka_trans = target_row['Roman Transliteration']
+            st.session_state.ayur_dravyaguna = target_row['Dravyaguna Profile (Rasa/Virya/Vipaka)']
+            st.session_state.ayur_karma = target_row['Classical Karma (Action)']
+            st.session_state.ayur_ligand = target_row['Phytochemical']
+            st.session_state.ayur_smiles = target_row['Canonical SMILES']
+            st.session_state.ayur_protein = target_row['Target Protein / Receptor Name']
+            st.session_state.is_ayur_loaded = True
+
             st.success(f"DravyaDock Pipeline successfully initialized for {target_row['Herb / Tree Name']}!")
             st.session_state.detected_pockets = []
             trigger_rerun = True
 
-    st.write("---")
-    
-    st.subheader("1. Target Protein Setup (Manual Override)")
-    
-    current_p_name = st.text_input("Protein Name", placeholder="Hint: Type protein name here...", value=st.session_state.protein_name)
-    current_p_id = st.text_input("PDB ID / Code", placeholder="Hint: Type PDB ID here...", value=st.session_state.pdb_id_display)
-    
-    if current_p_name != st.session_state.protein_name: st.session_state.protein_name = current_p_name
-    if current_p_id != st.session_state.pdb_id_display: st.session_state.pdb_id_display = current_p_id
-    st.write("---")
-    
-    protein_source = st.radio("Choose Protein Input Method:", ["Type 4-Letter PDB ID", "Upload File (.pdb or .pdbqt)"])
-    
-    if protein_source == "Type 4-Letter PDB ID":
-        pdb_id_input = st.text_input("Enter RCSB PDB ID", value="2AMB").strip()
-        if st.button("📥 Load Target Structure"):
-            if pdb_id_input:
-                success, path = fetch_pdb_from_rcsb(pdb_id_input)
-                if success:
+    # ---------------------------------------------------------------------
+    # INVISIBLE OVERRIDE: Hide if Auto-fill was used
+    # ---------------------------------------------------------------------
+    if not st.session_state.get('is_ayur_loaded', False):
+        st.write("---")
+        st.subheader("1. Target Protein Setup (Manual Override)")
+        
+        current_p_name = st.text_input("Protein Name", placeholder="Hint: Type protein name here...", value=st.session_state.protein_name)
+        current_p_id = st.text_input("PDB ID / Code", placeholder="Hint: Type PDB ID here...", value=st.session_state.pdb_id_display)
+        
+        if current_p_name != st.session_state.protein_name: st.session_state.protein_name = current_p_name
+        if current_p_id != st.session_state.pdb_id_display: st.session_state.pdb_id_display = current_p_id
+        st.write("---")
+        
+        protein_source = st.radio("Choose Protein Input Method:", ["Type 4-Letter PDB ID", "Upload File (.pdb or .pdbqt)"])
+        
+        if protein_source == "Type 4-Letter PDB ID":
+            pdb_id_input = st.text_input("Enter RCSB PDB ID", value="2AMB").strip()
+            if st.button("📥 Load Target Structure"):
+                if pdb_id_input:
+                    success, path = fetch_pdb_from_rcsb(pdb_id_input)
+                    if success:
+                        st.session_state.local_target_path = path
+                        meta = extract_pdb_metadata(path, pdb_id_input.upper())
+                        st.session_state.pdb_id_display = meta["id"]
+                        st.session_state.protein_name = meta["name"]
+                        conv_ok, _ = convert_pdb_to_pdbqt(path, "protein.pdbqt")
+                        st.session_state.target_ready = conv_ok
+                        st.success(f"Protein {pdb_id_input.upper()} successfully loaded!")
+                        trigger_rerun = True
+                    else: st.error(path)
+        else:
+            uploaded_file = st.file_uploader("Upload Target Protein File", type=["pdb", "pdbqt"])
+            if uploaded_file:
+                path = f"uploaded_{uploaded_file.name}"
+                if st.session_state.last_uploaded_protein != uploaded_file.name:
+                    with open(path, "wb") as f: f.write(uploaded_file.getbuffer())
                     st.session_state.local_target_path = path
-                    meta = extract_pdb_metadata(path, pdb_id_input.upper())
+                    meta = extract_pdb_metadata(path, "Uploaded File")
                     st.session_state.pdb_id_display = meta["id"]
                     st.session_state.protein_name = meta["name"]
-                    conv_ok, _ = convert_pdb_to_pdbqt(path, "protein.pdbqt")
-                    st.session_state.target_ready = conv_ok
-                    st.success(f"Protein {pdb_id_input.upper()} successfully loaded!")
+                    if uploaded_file.name.endswith(".pdb"):
+                        conv_ok, _ = convert_pdb_to_pdbqt(path, "protein.pdbqt")
+                        st.session_state.target_ready = conv_ok
+                    else:
+                        os.replace(path, "protein.pdbqt")
+                        st.session_state.target_ready = True
+                    st.session_state.last_uploaded_protein = uploaded_file.name
                     trigger_rerun = True
-                else: st.error(path)
-    else:
-        uploaded_file = st.file_uploader("Upload Target Protein File", type=["pdb", "pdbqt"])
-        if uploaded_file:
-            path = f"uploaded_{uploaded_file.name}"
-            if st.session_state.last_uploaded_protein != uploaded_file.name:
-                with open(path, "wb") as f: f.write(uploaded_file.getbuffer())
-                st.session_state.local_target_path = path
-                meta = extract_pdb_metadata(path, "Uploaded File")
-                st.session_state.pdb_id_display = meta["id"]
-                st.session_state.protein_name = meta["name"]
-                if uploaded_file.name.endswith(".pdb"):
-                    conv_ok, _ = convert_pdb_to_pdbqt(path, "protein.pdbqt")
-                    st.session_state.target_ready = conv_ok
-                else:
-                    os.replace(path, "protein.pdbqt")
-                    st.session_state.target_ready = True
-                st.session_state.last_uploaded_protein = uploaded_file.name
-                trigger_rerun = True
 
-    if st.session_state.target_ready and st.session_state.local_target_path:
-        discovered_het = discover_and_list_all_heteroatoms(st.session_state.local_target_path)
-        if discovered_het:
-            st.markdown("#### 🧬 Catalytic Cofactors & Heteroatom Filter")
-            st.markdown("*Select structurally active ions/cofactors to keep in the grid pocket framework. Unchecked entries (like crystallization buffer debris) will be stripped.*")
-            
-            selected_hets = []
-            cols_het = st.columns(min(len(discovered_het), 4))
-            for idx, (het_id, count) in enumerate(discovered_het.items()):
-                with cols_het[idx % 4]:
-                    if st.checkbox(f"Keep {het_id} ({count})", value=False, key=f"keep_het_{het_id}"):
-                        selected_hets.append(het_id)
-                        
-            if st.button("🛠 Rebuild Clean Receptor Structure Matrix"):
-                ok, err = convert_pdb_to_pdbqt(st.session_state.local_target_path, "protein.pdbqt", is_ligand=False, allowed_heteroatoms=selected_hets)
-                if ok:
-                    st.session_state.active_retained_ions = ", ".join(selected_hets) if selected_hets else "None (Fully Stripped)"
-                    st.success(f"Receptor rebuilt successfully! Retained: {st.session_state.active_retained_ions}")
-                    st.session_state.detected_pockets = [] 
-                else:
-                    st.error(f"Receptor optimization failure: {err}")
+        if st.session_state.target_ready and st.session_state.local_target_path:
+            discovered_het = discover_and_list_all_heteroatoms(st.session_state.local_target_path)
+            if discovered_het:
+                st.markdown("#### 🧬 Catalytic Cofactors & Heteroatom Filter")
+                st.markdown("*Select structurally active ions/cofactors to keep in the grid pocket framework. Unchecked entries (like crystallization buffer debris) will be stripped.*")
+                
+                selected_hets = []
+                cols_het = st.columns(min(len(discovered_het), 4))
+                for idx, (het_id, count) in enumerate(discovered_het.items()):
+                    with cols_het[idx % 4]:
+                        if st.checkbox(f"Keep {het_id} ({count})", value=False, key=f"keep_het_{het_id}"):
+                            selected_hets.append(het_id)
+                            
+                if st.button("🛠 Rebuild Clean Receptor Structure Matrix"):
+                    ok, err = convert_pdb_to_pdbqt(st.session_state.local_target_path, "protein.pdbqt", is_ligand=False, allowed_heteroatoms=selected_hets)
+                    if ok:
+                        st.session_state.active_retained_ions = ", ".join(selected_hets) if selected_hets else "None (Fully Stripped)"
+                        st.success(f"Receptor rebuilt successfully! Retained: {st.session_state.active_retained_ions}")
+                        st.session_state.detected_pockets = [] 
+                    else:
+                        st.error(f"Receptor optimization failure: {err}")
 
-        meta = extract_pdb_metadata(st.session_state.local_target_path, st.session_state.pdb_id_display)
-        st.markdown(f"> **Protein Summary Profile:** \n> * **Protein Name:** **{st.session_state.protein_name}** \n> * **Title:** {meta['title']} \n> * **PDB ID:** `{st.session_state.pdb_id_display}` | **Classification:** {meta['class']} \n> * **Resolution:** **{meta['res']}**")
+            meta = extract_pdb_metadata(st.session_state.local_target_path, st.session_state.pdb_id_display)
+            st.markdown(f"> **Protein Summary Profile:** \n> * **Protein Name:** **{st.session_state.protein_name}** \n> * **Title:** {meta['title']} \n> * **PDB ID:** `{st.session_state.pdb_id_display}` | **Classification:** {meta['class']} \n> * **Resolution:** **{meta['res']}**")
 
-    st.subheader("2. Small Molecule Ligand Setup")
-    ligand_source = st.radio("Choose Ligand Input Method:", ["SMILES String Input", "Upload Structural File (.pdb, .sdf)"])
-    
-    smiles_input_val = ""
-    uploaded_lig_buffer = None
-    uploaded_lig_name = ""
+        st.subheader("2. Small Molecule Ligand Setup")
+        ligand_source = st.radio("Choose Ligand Input Method:", ["SMILES String Input", "Upload Structural File (.pdb, .sdf)"])
+        
+        smiles_input_val = ""
+        uploaded_lig_buffer = None
+        uploaded_lig_name = ""
 
-    if ligand_source == "SMILES String Input":
-        smiles_input_val = st.text_input("Enter Ligand SMILES String", "CC(=O)NC1=CC=C(O)C=C1").strip()
-    else:
-        uploaded_lig_file = st.file_uploader("Upload Small Molecule File", type=["pdb", "sdf"])
-        if uploaded_lig_file:
-            uploaded_lig_buffer = uploaded_lig_file
-            uploaded_lig_name = uploaded_lig_file.name
+        if ligand_source == "SMILES String Input":
+            smiles_input_val = st.text_input("Enter Ligand SMILES String", "CC(=O)NC1=CC=C(O)C=C1").strip()
+        else:
+            uploaded_lig_file = st.file_uploader("Upload Small Molecule File", type=["pdb", "sdf"])
+            if uploaded_lig_file:
+                uploaded_lig_buffer = uploaded_lig_file
+                uploaded_lig_name = uploaded_lig_file.name
 
-    if st.button("📥 Load Ligand Structure", key="load_ligand_btn"):
-        if ligand_source == "SMILES String Input" and smiles_input_val:
-            with st.spinner("Querying PubChem Repositories..."):
-                pub_data = fetch_ligand_data_from_pubchem(smiles_input_val)
-                try:
-                    mol = Chem.MolFromSmiles(smiles_input_val)
+        if st.button("📥 Load Ligand Structure", key="load_ligand_btn"):
+            if ligand_source == "SMILES String Input" and smiles_input_val:
+                with st.spinner("Querying PubChem Repositories..."):
+                    pub_data = fetch_ligand_data_from_pubchem(smiles_input_val)
+                    try:
+                        mol = Chem.MolFromSmiles(smiles_input_val)
+                        if mol:
+                            ok, msg = convert_smiles_to_pdbqt(smiles_input_val, "ligand.pdbqt")
+                            if ok:
+                                st.session_state.ligand_ready = True
+                                st.session_state.smiles_cache = smiles_input_val
+                                with open("ligand.pdbqt", "r") as f: st.session_state.serialized_ligand_block = f.read()
+                                st.session_state.ligand_summary_text = f"**Name:** {pub_data['name']} | **Formula:** {pub_data['formula']} | **Molecular Weight:** {pub_data['mw']}"
+                                st.success("Ligand metadata mapped from PubChem!")
+                                trigger_rerun = True
+                            else: st.error(msg)
+                    except Exception as e: st.error(f"SMILES Parsing Failure: {e}")
+                    
+            elif ligand_source == "Upload Structural File (.pdb, .sdf)" and uploaded_lig_buffer is not None:
+                if st.session_state.last_uploaded_ligand != uploaded_lig_name:
+                    temp_in = f"raw_ligand_{uploaded_lig_name}"
+                    with open(temp_in, "wb") as f: f.write(uploaded_lig_buffer.getbuffer())
+                    
+                    mol = Chem.MolFromPDBFile(temp_in, removeHs=False) if uploaded_lig_name.endswith(".pdb") else Chem.SDMolSupplier(temp_in, removeHs=False)[0]
+                    
                     if mol:
-                        ok, msg = convert_smiles_to_pdbqt(smiles_input_val, "ligand.pdbqt")
-                        if ok:
-                            st.session_state.ligand_ready = True
-                            st.session_state.smiles_cache = smiles_input_val
-                            with open("ligand.pdbqt", "r") as f: st.session_state.serialized_ligand_block = f.read()
-                            st.session_state.ligand_summary_text = f"**Name:** {pub_data['name']} | **Formula:** {pub_data['formula']} | **Molecular Weight:** {pub_data['mw']}"
-                            st.success("Ligand metadata mapped from PubChem!")
-                            trigger_rerun = True
-                        else: st.error(msg)
-                except Exception as e: st.error(f"SMILES Parsing Failure: {e}")
-                
-        elif ligand_source == "Upload Structural File (.pdb, .sdf)" and uploaded_lig_buffer is not None:
-            if st.session_state.last_uploaded_ligand != uploaded_lig_name:
-                temp_in = f"raw_ligand_{uploaded_lig_name}"
-                with open(temp_in, "wb") as f: f.write(uploaded_lig_buffer.getbuffer())
-                
-                mol = Chem.MolFromPDBFile(temp_in, removeHs=False) if uploaded_lig_name.endswith(".pdb") else Chem.SDMolSupplier(temp_in, removeHs=False)[0]
-                
-                if mol:
-                    extracted_smiles = ""
-                    try: 
-                        try: Chem.DetermineBonds(mol)
-                        except: pass
-                        Chem.SanitizeMol(mol)
-                        AllChem.AssignBondOrdersFromTopology(mol)
-                        extracted_smiles = Chem.MolToSmiles(Chem.RemoveHs(mol))
-                    except Exception: 
-                        try: extracted_smiles = Chem.MolToSmiles(Chem.RemoveHs(mol))
-                        except: pass
-                    
-                    if not extracted_smiles:
-                        st.error("⚠️ RDKit could not deduce bond orders from the uploaded spatial coordinates.")
-                        st.session_state.smiles_cache = ""
-                    else:
-                        st.session_state.smiles_cache = extracted_smiles 
-                    
-                    if mol.GetNumConformers() == 0:
-                        mol = Chem.AddHs(mol)
-                        AllChem.EmbedMolecule(mol, AllChem.ETKDGv3())
-                        AllChem.MMFFOptimizeMolecule(mol)
+                        extracted_smiles = ""
+                        try: 
+                            try: Chem.DetermineBonds(mol)
+                            except: pass
+                            Chem.SanitizeMol(mol)
+                            AllChem.AssignBondOrdersFromTopology(mol)
+                            extracted_smiles = Chem.MolToSmiles(Chem.RemoveHs(mol))
+                        except Exception: 
+                            try: extracted_smiles = Chem.MolToSmiles(Chem.RemoveHs(mol))
+                            except: pass
                         
-                    temp_pdb = "temp_lig_state.pdb"
-                    Chem.MolToPDBFile(mol, temp_pdb)
-                    ok, _ = convert_pdb_to_pdbqt(temp_pdb, "ligand.pdbqt", is_ligand=True)
-                    st.session_state.ligand_ready = ok
-                    if os.path.exists(temp_pdb): os.remove(temp_pdb)
-                else:
-                    ok, _ = convert_pdb_to_pdbqt(temp_in, "ligand.pdbqt", is_ligand=True)
-                    st.session_state.ligand_ready = ok
-                    st.session_state.smiles_cache = ""
-                
-                if st.session_state.ligand_ready:
-                    st.session_state.ligand_summary_text = f"Ligand 3D coordinates loaded securely. Extracted Base Template: `{extracted_smiles if extracted_smiles else 'Failed'}`"
-                    with open("ligand.pdbqt", "r") as f: st.session_state.serialized_ligand_block = f.read()
-                    st.session_state.last_uploaded_ligand = uploaded_lig_name
-                    
-                    if not st.session_state.smiles_cache:
-                        st.warning("Note: 3D coordinates loaded for docking, but the 2D SMILES sequence could not be abstracted. Generative Redesign (Phase 2) will require manual SMILES entry.")
+                        if not extracted_smiles:
+                            st.error("⚠️ RDKit could not deduce bond orders from the uploaded spatial coordinates.")
+                            st.session_state.smiles_cache = ""
+                        else:
+                            st.session_state.smiles_cache = extracted_smiles 
+                        
+                        if mol.GetNumConformers() == 0:
+                            mol = Chem.AddHs(mol)
+                            AllChem.EmbedMolecule(mol, AllChem.ETKDGv3())
+                            AllChem.MMFFOptimizeMolecule(mol)
+                            
+                        temp_pdb = "temp_lig_state.pdb"
+                        Chem.MolToPDBFile(mol, temp_pdb)
+                        ok, _ = convert_pdb_to_pdbqt(temp_pdb, "ligand.pdbqt", is_ligand=True)
+                        st.session_state.ligand_ready = ok
+                        if os.path.exists(temp_pdb): os.remove(temp_pdb)
                     else:
-                        st.success("Structural file loaded! The abstracted SMILES matrix has successfully unlocked Phase 2 and Phase 3.")
+                        ok, _ = convert_pdb_to_pdbqt(temp_in, "ligand.pdbqt", is_ligand=True)
+                        st.session_state.ligand_ready = ok
+                        st.session_state.smiles_cache = ""
                     
-                    time.sleep(0.5)
-                    st.rerun()
-                else: st.error("Failed to parse ligand coordinate matrix.")
-                if os.path.exists(temp_in): os.remove(temp_in)
+                    if st.session_state.ligand_ready:
+                        st.session_state.ligand_summary_text = f"Ligand 3D coordinates loaded securely. Extracted Base Template: `{extracted_smiles if extracted_smiles else 'Failed'}`"
+                        with open("ligand.pdbqt", "r") as f: st.session_state.serialized_ligand_block = f.read()
+                        st.session_state.last_uploaded_ligand = uploaded_lig_name
+                        
+                        if not st.session_state.smiles_cache:
+                            st.warning("Note: 3D coordinates loaded for docking, but the 2D SMILES sequence could not be abstracted. Generative Redesign (Phase 2) will require manual SMILES entry.")
+                        else:
+                            st.success("Structural file loaded! The abstracted SMILES matrix has successfully unlocked Phase 2 and Phase 3.")
+                        
+                        time.sleep(0.5)
+                        st.rerun()
+                    else: st.error("Failed to parse ligand coordinate matrix.")
+                    if os.path.exists(temp_in): os.remove(temp_in)
+
+    else:
+        st.write("---")
+        st.success("✅ **Target Protein & Ligand successfully auto-loaded from Ayurvedic Database.** Pipeline ready for docking.")
 
     if st.session_state.target_ready and os.path.exists("ligand.pdbqt"):
         st.session_state.ligand_ready = True
@@ -1395,6 +1489,7 @@ with col_params:
         st.markdown(f"> **Ligand Metric Summary Profile:** \n> {st.session_state.ligand_summary_text}")
 
     # --- CAVITY & BOUND SITE FINDER ---
+    st.write("---")
     st.subheader("3. Smart Cavity & Bound Site Finder")
     if st.session_state.target_ready and os.path.exists("protein.pdbqt"):
         if st.button("🔍 Scan Surface For Structural Cavities", use_container_width=True):
@@ -1684,15 +1779,30 @@ Dr. Sarang S. Dhote, "InSilico BioSphere: An Integrated Platform for Automated M
                 df_int_orig = pd.DataFrame(active_interactions)
                 orig_matrix_html = df_int_orig[["Residue Contact", "Interaction Type", "Distance (Å)"]].to_html(index=False, classes="data-table") if not df_int_orig.empty else "<p>No close contacts detected.</p>"
 
+                ayur_data_dict = {
+                    'is_loaded': st.session_state.get('is_ayur_loaded', False),
+                    'tree_name': st.session_state.get('ayur_tree_name', ''),
+                    'scientific': st.session_state.get('ayur_scientific', ''),
+                    'family': st.session_state.get('ayur_family', ''),
+                    'activity': st.session_state.get('ayur_activity', ''),
+                    'shloka': st.session_state.get('ayur_shloka', ''),
+                    'shloka_trans': st.session_state.get('ayur_shloka_trans', ''),
+                    'dravyaguna': st.session_state.get('ayur_dravyaguna', ''),
+                    'karma': st.session_state.get('ayur_karma', ''),
+                    'ligand': st.session_state.get('ayur_ligand', ''),
+                    'smiles': st.session_state.get('ayur_smiles', ''),
+                    'protein': st.session_state.get('ayur_protein', '')
+                }
+
                 p1_html_report = build_phase1_html_report(
                     meta=meta_data, p_2d=b_img, smiles_cache=st.session_state.smiles_cache, 
                     grid_params=grid_params, df_results_p1=df_results_p1, orig_ints=active_interactions, 
                     receptor_data=protein_data, orig_ligand_pose_data=parsed_poses[selected_pose], 
                     selected_pose_orig=selected_pose, style_mode=style_mode_p1, 
-                    show_surface=surf_toggle_p1, pre_uff=pre_uff, post_uff=post_uff, 
+                    show_surface=surf_toggle_p1, pre_uff=post_uff, post_uff=post_uff, 
                     delta_uff=delta_uff, active_retained_ions=st.session_state.active_retained_ions,
                     uff_theory_html=report_uff_theory_html, orig_matrix_html=orig_matrix_html,
-                    grid_strategy=st.session_state.selected_native_ligand
+                    grid_strategy=st.session_state.selected_native_ligand, ayur_data=ayur_data_dict
                 )
 
                 st.download_button(label="📥 Download Phase 1 HTML Research Report", data=p1_html_report, file_name=f"InSilico_Phase1_Report_{st.session_state.pdb_id_display}.html", mime="text/html", use_container_width=True, key="dl_phase1")
@@ -2164,6 +2274,21 @@ Dr. Sarang S. Dhote, "InSilico BioSphere: An Integrated Platform for Automated M
             df_int_new = pd.DataFrame(new_ints)
             new_matrix_html = df_int_new[["Residue Contact", "Interaction Type", "Distance (Å)"]].to_html(index=False, classes="data-table") if not df_int_new.empty else "<p>No close contacts detected.</p>"
 
+            ayur_data_dict = {
+                'is_loaded': st.session_state.get('is_ayur_loaded', False),
+                'tree_name': st.session_state.get('ayur_tree_name', ''),
+                'scientific': st.session_state.get('ayur_scientific', ''),
+                'family': st.session_state.get('ayur_family', ''),
+                'activity': st.session_state.get('ayur_activity', ''),
+                'shloka': st.session_state.get('ayur_shloka', ''),
+                'shloka_trans': st.session_state.get('ayur_shloka_trans', ''),
+                'dravyaguna': st.session_state.get('ayur_dravyaguna', ''),
+                'karma': st.session_state.get('ayur_karma', ''),
+                'ligand': st.session_state.get('ayur_ligand', ''),
+                'smiles': st.session_state.get('ayur_smiles', ''),
+                'protein': st.session_state.get('ayur_protein', '')
+            }
+
             html_report = build_comprehensive_html_report(
                 meta=meta_data, adme_p=adme_p, adme_v=adme_v, variant_row=v_row, iupac=iupac, shift_msg=shift_msg, 
                 f_img=ftir_b64, v_2d=v_2d, p_2d=b_img, smiles_cache=st.session_state.smiles_cache, 
@@ -2175,7 +2300,7 @@ Dr. Sarang S. Dhote, "InSilico BioSphere: An Integrated Platform for Automated M
                 style_mode_new=style_mode_p4_new, show_surface_new=surf_toggle_p4_new,
                 master_verdict=master_verdict, df_comparison_html=df_comparison_html, pre_uff=pre_uff, post_uff=post_uff, delta_uff=delta_uff,
                 active_retained_ions=st.session_state.active_retained_ions, uff_theory_html=report_uff_theory_html,
-                orig_matrix_html=orig_matrix_html, new_matrix_html=new_matrix_html, grid_strategy=st.session_state.selected_native_ligand
+                orig_matrix_html=orig_matrix_html, new_matrix_html=new_matrix_html, grid_strategy=st.session_state.selected_native_ligand, ayur_data=ayur_data_dict
             )
             
             st.download_button(label="📥 Download Consolidated Manuscript Quality HTML Research Report", data=html_report, file_name=f"InSilico_BioSphere_Research_Record_{v_row['Variant ID']}.html", mime="text/html", use_container_width=True, key="dl_phase4")
