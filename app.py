@@ -1073,31 +1073,8 @@ def build_comprehensive_html_report(meta, adme_p, adme_v, variant_row, iupac, sh
     """
 
 # =====================================================================
-# 6. APPLICATION DASHBOARD WORKSPACE (SINGLE PAGE FLOW)
+# 5. AYURVEDIC DATABASE LOADER (DRAVYADOCK CORE)
 # =====================================================================
-
-st.set_page_config(page_title="In Silico BioSphere Hub", layout="wide")
-st.title("🔬 InSilico BioSphere - Unified Drug Design Engine")
-st.markdown("**Developed by: Dr. Sarang S. Dhote, Assistant Professor, Department of Chemistry, Shivaji Science College, Nagpur, India | Tech Logic Core Systems (TLCS)**")
-
-# Master Reset
-if st.button("🔄 Reset Entire Environment", type="secondary", use_container_width=True):
-    for key in list(st.session_state.keys()): del st.session_state[key]
-    for f in ["protein.pdbqt", "ligand.pdbqt", "docking_poses.pdbqt", "temp_lig_state.pdb", "redesign_ligand.pdbqt", "redesign_docking_poses.pdbqt"]:
-        if os.path.exists(f): os.remove(f)
-    st.success("Dashboard cache and runtime structures completely cleared!")
-    safe_rerun()
-
-# ---------------------------------------------------------------------
-# SAFEGUARD FALLBACKS
-# ---------------------------------------------------------------------
-if os.path.exists("protein.pdbqt"): st.session_state.target_ready = True
-if os.path.exists("ligand.pdbqt"): st.session_state.ligand_ready = True
-
-# ---------------------------------------------------------------------
-# PHASE 0: AYURVEDIC PHYTOCHEMICAL DATABASE EXPLORER
-# ---------------------------------------------------------------------
-
 @st.cache_data
 def load_ayurvedic_db():
     hardcoded_data = [
@@ -1154,172 +1131,28 @@ def load_ayurvedic_db():
     ]
     return pd.DataFrame(hardcoded_data)
 
-st.write("---")
-st.header("🌿 Phase 0: Ayurvedic Phytochemical Database Explorer")
-st.markdown("*Browse 50 validated Ayurvedic herb–phytochemical–target pairings. Select any entry to automatically pre-load the Protein (PDB ID) and Ligand (SMILES) into Phase 1.*")
+# =====================================================================
+# 6. APPLICATION DASHBOARD WORKSPACE (SINGLE PAGE FLOW)
+# =====================================================================
 
-ayur_df = load_ayurvedic_db()
+st.set_page_config(page_title="DravyaDock Hub", layout="wide")
+st.title("🌿 DravyaDock (द्रव्यDock) - Computational Ayurvedic Molecular Docking Platform")
+st.markdown("**DravyaDock bridges traditional Ayurvedic pharmacology (Dravyaguna Vidya) from the Bhavaprakasha Nighantu with modern translational structural bioinformatics and structure-based drug discovery pipelines.**")
+st.markdown("**Developed by: Dr. Sarang S. Dhote, Assistant Professor, Department of Chemistry, Shivaji Science College, Nagpur, India | Tech Logic Core Systems (TLCS)**")
 
-with st.expander("🔍 Browse & Filter Database", expanded=True):
-    p0_col1, p0_col2, p0_col3 = st.columns(3)
+# Master Reset
+if st.button("🔄 Reset Entire Environment", type="secondary", use_container_width=True):
+    for key in list(st.session_state.keys()): del st.session_state[key]
+    for f in ["protein.pdbqt", "ligand.pdbqt", "docking_poses.pdbqt", "temp_lig_state.pdb", "redesign_ligand.pdbqt", "redesign_docking_poses.pdbqt"]:
+        if os.path.exists(f): os.remove(f)
+    st.success("Dashboard cache and runtime structures completely cleared!")
+    safe_rerun()
 
-    with p0_col1:
-        search_query = st.text_input("🔎 Search Herb / Phytochemical / Activity", placeholder="e.g. Turmeric, Anticancer, Curcumin...")
-
-    with p0_col2:
-        all_activities = sorted(ayur_df["Medicinal Activity"].unique().tolist())
-        selected_activity = st.selectbox("Filter by Medicinal Activity", ["All Activities"] + all_activities)
-
-    with p0_col3:
-        all_herbs = sorted(ayur_df["Herb / Tree Name"].unique().tolist())
-        selected_herb = st.selectbox("Filter by Herb / Tree", ["All Herbs"] + all_herbs)
-
-    # Apply filters
-    filtered_df = ayur_df.copy()
-    if search_query:
-        mask = (
-            filtered_df["Herb / Tree Name"].str.contains(search_query, case=False, na=False) |
-            filtered_df["Phytochemical"].str.contains(search_query, case=False, na=False) |
-            filtered_df["Medicinal Activity"].str.contains(search_query, case=False, na=False) |
-            filtered_df["Scientific Name"].str.contains(search_query, case=False, na=False) |
-            filtered_df["Target Protein / Receptor Name"].str.contains(search_query, case=False, na=False)
-        )
-        filtered_df = filtered_df[mask]
-    if selected_activity != "All Activities":
-        filtered_df = filtered_df[filtered_df["Medicinal Activity"] == selected_activity]
-    if selected_herb != "All Herbs":
-        filtered_df = filtered_df[filtered_df["Herb / Tree Name"] == selected_herb]
-
-    st.markdown(f"**{len(filtered_df)} entries found**")
-
-    # Display table with selection
-    display_cols = ["Master ID", "Herb / Tree Name", "Scientific Name", "Phytochemical", "Medicinal Activity", "Target Protein / Receptor Name", "PDB ID"]
-    st.dataframe(filtered_df[display_cols].reset_index(drop=True), use_container_width=True, hide_index=True)
-
-# Entry selection panel
-st.markdown("#### 🧬 Select an Entry to Auto-Load into Docking Pipeline")
-
-p0_sel_col1, p0_sel_col2 = st.columns([2, 1])
-
-with p0_sel_col1:
-    entry_labels = [
-        f"{row['Master ID']} | {row['Herb / Tree Name']} → {row['Phytochemical']} | {row['Medicinal Activity']} | PDB: {row['PDB ID']}"
-        for _, row in ayur_df.iterrows()
-    ]
-    selected_entry_label = st.selectbox("Choose Entry from Full Database:", entry_labels, key="p0_entry_selector")
-
-selected_master_id = selected_entry_label.split(" | ")[0].strip()
-selected_row = ayur_df[ayur_df["Master ID"] == selected_master_id].iloc[0]
-
-with p0_sel_col2:
-    st.markdown("**Selected Entry Preview**")
-    st.markdown(f"🌿 **Herb:** {selected_row['Herb / Tree Name']} (*{selected_row['Scientific Name']}*)")
-    st.markdown(f"🧪 **Phytochemical:** {selected_row['Phytochemical']}")
-    st.markdown(f"🎯 **Target:** {selected_row['Target Protein / Receptor Name']}")
-    st.markdown(f"🔑 **PDB ID:** `{selected_row['PDB ID']}`")
-    st.markdown(f"💊 **Activity:** {selected_row['Medicinal Activity']}")
-
-# Detail card with Ayurvedic context
-with st.expander("📖 View Full Ayurvedic Profile of Selected Entry", expanded=False):
-    d_col1, d_col2 = st.columns(2)
-    with d_col1:
-        st.markdown(f"**Family:** {selected_row['Family']}")
-        st.markdown(f"**Dravyaguna (Rasa/Virya/Vipaka):** {selected_row['Dravyaguna Profile (Rasa/Virya/Vipaka)']}")
-        st.markdown(f"**Classical Karma (Action):** {selected_row['Classical Karma (Action)']}")
-        st.markdown(f"**Canonical SMILES:** `{selected_row['Canonical SMILES']}`")
-    with d_col2:
-        st.markdown(f"**Sanskrit Shloka:**")
-        st.markdown(f"> {selected_row['Sanskrit Shloka (Bhavaprakasha Nighantu)']}")
-        st.markdown(f"*{selected_row['Roman Transliteration']}*")
-        # Show 2D structure preview
-        img_html = generate_clean_2d_image(selected_row['Canonical SMILES'], zoom_level=300)
-        if img_html:
-            st.markdown("**2D Structure Preview:**")
-            st.markdown(img_html, unsafe_allow_html=True)
-
-# Auto-load button
-st.markdown("---")
-p0_btn_col1, p0_btn_col2, p0_btn_col3 = st.columns([1, 2, 1])
-with p0_btn_col2:
-    if st.button(
-        f"🚀 Auto-Load: {selected_row['Phytochemical']} → PDB {selected_row['PDB ID']} into Docking Pipeline",
-        type="primary",
-        use_container_width=True,
-        key="p0_autoload_btn"
-    ):
-        _p0_pdb = selected_row["PDB ID"].strip()
-        _p0_smiles = selected_row["Canonical SMILES"].strip()
-        _p0_protein_name = selected_row["Target Protein / Receptor Name"]
-        _p0_phytochem = selected_row["Phytochemical"]
-
-        with st.spinner(f"Fetching PDB structure {_p0_pdb} from RCSB..."):
-            _p0_ok, _p0_path = fetch_pdb_from_rcsb(_p0_pdb)
-
-        if _p0_ok:
-            st.session_state.local_target_path = _p0_path
-            _p0_meta = extract_pdb_metadata(_p0_path, _p0_pdb.upper())
-            st.session_state.pdb_id_display = _p0_pdb.upper()
-            st.session_state.protein_name = _p0_protein_name
-            _p0_conv_ok, _p0_conv_err = convert_pdb_to_pdbqt(_p0_path, "protein.pdbqt")
-            st.session_state.target_ready = _p0_conv_ok
-            if not _p0_conv_ok:
-                st.warning(f"Protein structure fetched but PDBQT conversion had an issue: {_p0_conv_err}. You can still proceed.")
-            else:
-                st.success(f"✅ Protein **{_p0_protein_name}** (PDB: {_p0_pdb.upper()}) loaded successfully!")
-        else:
-            st.error(f"❌ Could not fetch PDB {_p0_pdb}: {_p0_path}. Enter PDB ID manually in Phase 1.")
-            st.session_state.pdb_id_display = _p0_pdb.upper()
-            st.session_state.protein_name = _p0_protein_name
-
-        with st.spinner(f"Processing ligand SMILES for {_p0_phytochem}..."):
-            try:
-                _p0_mol = Chem.MolFromSmiles(_p0_smiles)
-                if _p0_mol:
-                    _p0_lig_ok, _p0_lig_msg = convert_smiles_to_pdbqt(_p0_smiles, "ligand.pdbqt")
-                    if _p0_lig_ok:
-                        st.session_state.ligand_ready = True
-                        st.session_state.smiles_cache = _p0_smiles
-                        with open("ligand.pdbqt", "r") as _f: st.session_state.serialized_ligand_block = _f.read()
-                        _p0_pub = fetch_ligand_data_from_pubchem(_p0_smiles)
-                        st.session_state.ligand_summary_text = (
-                            f"**Name:** {_p0_pub.get('name', _p0_phytochem)} | "
-                            f"**Formula:** {_p0_pub.get('formula', 'N/A')} | "
-                            f"**Molecular Weight:** {_p0_pub.get('mw', 'N/A')}"
-                        )
-                        st.success(f"✅ Ligand **{_p0_phytochem}** loaded and converted successfully!")
-                    else:
-                        st.error(f"❌ Ligand PDBQT conversion failed: {_p0_lig_msg}")
-                else:
-                    st.error(f"❌ Invalid SMILES string for {_p0_phytochem}. Please enter SMILES manually in Phase 1.")
-            except Exception as _p0_e:
-                st.error(f"❌ Ligand processing error: {_p0_e}")
-
-        if st.session_state.target_ready and st.session_state.ligand_ready:
-            st.success("🎉 Both Protein & Ligand auto-loaded! Scroll down to Phase 1 to configure the grid and run docking.")
-        elif st.session_state.target_ready:
-            st.info("ℹ️ Protein loaded. Ligand had an issue — please set it manually in Phase 1.")
-        elif st.session_state.ligand_ready:
-            st.info("ℹ️ Ligand loaded. Protein had an issue — please set it manually in Phase 1.")
-
-        trigger_rerun = True
-
-# Status bar
-p0_status_col1, p0_status_col2, p0_status_col3 = st.columns(3)
-with p0_status_col1:
-    if st.session_state.target_ready:
-        st.success(f"🎯 Protein Ready: **{st.session_state.protein_name}** (PDB: {st.session_state.pdb_id_display})")
-    else:
-        st.info("🎯 No protein loaded yet")
-with p0_status_col2:
-    if st.session_state.ligand_ready:
-        st.success(f"🧪 Ligand Ready: SMILES cached ({len(st.session_state.smiles_cache)} chars)")
-    else:
-        st.info("🧪 No ligand loaded yet")
-with p0_status_col3:
-    if st.session_state.target_ready and st.session_state.ligand_ready:
-        st.success("✅ Pipeline Ready — proceed to Phase 1")
-    else:
-        st.warning("⚠️ Load both protein & ligand to unlock docking")
+# ---------------------------------------------------------------------
+# SAFEGUARD FALLBACKS
+# ---------------------------------------------------------------------
+if os.path.exists("protein.pdbqt"): st.session_state.target_ready = True
+if os.path.exists("ligand.pdbqt"): st.session_state.ligand_ready = True
 
 # ---------------------------------------------------------------------
 # PHASE 1: CORE BASELINE DOCKING ENGINE
@@ -1332,7 +1165,72 @@ col_params, col_visual = st.columns([1, 1])
 trigger_rerun = False
 
 with col_params:
-    st.subheader("1. Target Protein Setup")
+    st.subheader("🌿 Step 0: DravyaDock Ayurvedic Database (Auto-Populate)")
+    
+    ayush_df = load_ayurvedic_db()
+    filter_type = st.radio("Search Database by:", ["Herb / Tree Name", "Medicinal Activity"], horizontal=True)
+
+    if filter_type == "Herb / Tree Name":
+        options = ayush_df["Herb / Tree Name"].unique().tolist()
+        selected_opt = st.selectbox("Select Ayurvedic Herb/Tree:", options)
+        filtered_df = ayush_df[ayush_df["Herb / Tree Name"] == selected_opt]
+    else:
+        options = ayush_df["Medicinal Activity"].unique().tolist()
+        selected_opt = st.selectbox("Select Target Medicinal Activity:", options)
+        filtered_df = ayush_df[ayush_df["Medicinal Activity"] == selected_opt]
+
+    selected_entry_str = st.selectbox(
+        "Select Specific Target Protein & Phytochemical Scaffold:",
+        filtered_df.apply(lambda row: f"{row['Herb / Tree Name']} - {row['Phytochemical']} vs {row['Target Protein / Receptor Name']} ({row['PDB ID']})", axis=1).tolist()
+    )
+
+    if st.button("📥 Auto-Fill & Load DravyaDock Pipeline", type="primary"):
+        # Match back to the specific row
+        idx = filtered_df.apply(lambda row: f"{row['Herb / Tree Name']} - {row['Phytochemical']} vs {row['Target Protein / Receptor Name']} ({row['PDB ID']})", axis=1) == selected_entry_str
+        target_row = filtered_df[idx].iloc[0]
+
+        pdb_id = target_row["PDB ID"].strip()
+        smiles = target_row["Canonical SMILES"].strip()
+        prot_name = target_row["Target Protein / Receptor Name"].strip()
+
+        # Step A: Load Target Protein
+        with st.spinner(f"Loading Target Protein {pdb_id} from DB..."):
+            success, path = fetch_pdb_from_rcsb(pdb_id)
+            if success:
+                st.session_state.local_target_path = path
+                st.session_state.pdb_id_display = pdb_id
+                st.session_state.protein_name = prot_name
+                conv_ok, _ = convert_pdb_to_pdbqt(path, "protein.pdbqt")
+                st.session_state.target_ready = conv_ok
+
+        # Step B: Load Phytochemical Ligand
+        with st.spinner(f"Loading Phytochemical {target_row['Phytochemical']}..."):
+            pub_data = fetch_ligand_data_from_pubchem(smiles)
+            ok, msg = convert_smiles_to_pdbqt(smiles, "ligand.pdbqt")
+            if ok:
+                st.session_state.ligand_ready = True
+                st.session_state.smiles_cache = smiles
+                with open("ligand.pdbqt", "r") as f: st.session_state.serialized_ligand_block = f.read()
+                
+                # Append Traditional Ayurvedic Data to the summary text
+                st.session_state.ligand_summary_text = (
+                    f"**Phytochemical Identifier:** {target_row['Phytochemical']} | **Formula:** {pub_data['formula']} | **MW:** {pub_data['mw']}\n\n"
+                    f"> **Dravyaguna Matrix (Ayurvedic Profile):**\n"
+                    f"> * **Shloka:** {target_row['Sanskrit Shloka (Bhavaprakasha Nighantu)']}\n"
+                    f"> * **Pharmacology:** {target_row['Dravyaguna Profile (Rasa/Virya/Vipaka)']}\n"
+                    f"> * **Classical Action:** {target_row['Classical Karma (Action)']}"
+                )
+            else:
+                st.error(f"Ligand Conversion Error: {msg}")
+
+        if st.session_state.target_ready and st.session_state.ligand_ready:
+            st.success(f"DravyaDock Pipeline successfully initialized for {target_row['Herb / Tree Name']}!")
+            st.session_state.detected_pockets = []
+            trigger_rerun = True
+
+    st.write("---")
+    
+    st.subheader("1. Target Protein Setup (Manual Override)")
     
     current_p_name = st.text_input("Protein Name", placeholder="Hint: Type protein name here...", value=st.session_state.protein_name)
     current_p_id = st.text_input("PDB ID / Code", placeholder="Hint: Type PDB ID here...", value=st.session_state.pdb_id_display)
@@ -2175,7 +2073,7 @@ else:
   This represents the total internal physical stress of the protein-ligand complex the moment AutoDock Vina finished placing your molecule into the pocket, before any relaxation occurred. A highly positive energy score indicates extreme geometric tension, often a steric clash where atoms physically overlap with rigid atoms of the receptor or retained catalytic cofactors. In a living biological system, atoms shift to relieve this, but a rigid grid does not allow it.
 
 - 📉 Optimized Energy: {post_uff} kcal/mol
-  This is the total stress of the complex after the Universal Force Field (UFF) algorithm ran its gradient descent optimization. The algorithm took the overlapping atoms and gently pushed them apart by fractions of an Angstrom until the bond lengths and angles reached a naturally permissible state, making the system structurally stable. The critical metric is the massive drop from the initial state ({delta_uff} kcal/mol).
+  This is the total stress of the complex after the Universal Force Field (UFF) algorithm ran took the overlapping atoms and gently pushed them apart by fractions of an Angstrom until the bond lengths and angles reached a naturally permissible state, making the system structurally stable. The critical metric is the massive drop from the initial state ({delta_uff} kcal/mol).
 """
                 report_uff_theory_html = f"""
                 <details style="background-color: #f9fbff; border-left: 6px solid #1e3c72; padding: 15px; border-radius: 4px; margin-top: 20px;">
