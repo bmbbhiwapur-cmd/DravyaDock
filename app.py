@@ -251,7 +251,7 @@ def compute_protein_bounding_box(pdbqt_file):
     center = (min_c + max_c) / 2.0
     size = (max_c - min_c) + 15.0
     
-    # ⚠️ Cloud RAM Protection: Cap maximum grid dimensions to 60 Å to prevent UI crash
+    # Cloud RAM Protection: Cap maximum grid dimensions to 60 Å to prevent UI crash
     safe_sx = min(60.0, size[0])
     safe_sy = min(60.0, size[1])
     safe_sz = min(60.0, size[2])
@@ -307,7 +307,7 @@ def convert_pdb_to_pdbqt(input_pdb, output_pdbqt="protein.pdbqt", is_ligand=Fals
         if os.path.exists(temp_out): os.remove(temp_out)
         return False, str(e)
 
-# --- 🚀 REBUILT: BULLETPROOF RDKIT 3D COORDINATE GENERATOR ---
+# --- REBUILT: BULLETPROOF RDKIT 3D COORDINATE GENERATOR ---
 def convert_smiles_to_pdbqt(smiles_string, output_filename="ligand.pdbqt"):
     try:
         mol = Chem.MolFromSmiles(smiles_string)
@@ -569,7 +569,7 @@ def get_dynamic_fragments(parent_smiles):
             {"name": "Fluorination (-F)", "smiles": "F", "peak": 1150, "yield": "Poor Yield (38%)", "route": "Late-stage electrophilic fluorination using Selectfluor."}
         ]
 
-# --- 🚀 REBUILT: FAIL-SAFE CLEAVING ENGINE ---
+# --- REBUILT: FAIL-SAFE CLEAVING ENGINE ---
 def run_cleaving_engine(parent_smiles, target_atom_idx, mechanism_mode):
     parent_mol = Chem.MolFromSmiles(parent_smiles)
     if not parent_mol: return []
@@ -1174,7 +1174,7 @@ def load_ayurvedic_db():
         {"Master ID": "M-009", "Herb / Tree Name": "Vasaka", "Scientific Name": "Justicia adhatoda", "Family": "Acanthaceae", "Phytochemical": "Vasicine", "Canonical SMILES": "C1CC2=NC3=CC=CC=C3C4C2(C1)N=C(O4)C", "Medicinal Activity": "Bronchodilator", "Target Protein / Receptor Name": "Beta-2 Adrenergic Receptor", "PDB ID": "7DHI", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "वासको वासिका वासा भिषङ्माता च सिंहिका। वासा तिक्ता कषायोष्णा कफपित्तविनाशिनी॥", "Roman Transliteration": "vāsako vāsikā vāsā bhiṣaṅmātā ca siṃhikā | vāsā tiktā kaṣāyoṣṇā kaphapittavināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Kasaya; Virya: Shita; Vipaka: Katu", "Classical Karma (Action)": "Kashahara (Antitussive) Shwasahara (Bronchodilator)"},
         {"Master ID": "M-010", "Herb / Tree Name": "Licorice (Mulethi)", "Scientific Name": "Glycyrrhiza glabra", "Family": "Fabaceae", "Phytochemical": "Glycyrrhizin", "Canonical SMILES": "CC1(C2CCC3(C(C2(CCC1(C(=O)O)C)O)C(=O)C=C4C3(CCC5(C4CC(C(C5)(C)C(=O)O)OC6C(C(C(C(O6)C(=O)O)O)O)OC7C(C(C(C(O7)C(=O)O)O)O)O)C)C)C)C", "Medicinal Activity": "Antiviral", "Target Protein / Receptor Name": "SARS-CoV-2 Main Protease (Mpro)", "PDB ID": "6LU7", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "यष्टीमधु रसं स्वादु सुशीलं बलवर्णकृत्। गुरु चक्षुष्यं वृष्यं च व्रणशोथविनाशनम्॥", "Roman Transliteration": "yaṣṭīmadhu rasaṃ svādu suśīlaṃ balavarṇakṛt | guru cakṣuṣyaṃ vṛṣyaṃ ca vraṇaśothavināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Madhura; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Vranashothahara Varnya Balya Jvarahara"},
         {"Master ID": "M-011", "Herb / Tree Name": "Amla", "Scientific Name": "Phyllanthus emblica", "Family": "Phyllanthaceae", "Phytochemical": "Gallic Acid", "Canonical SMILES": "C1=C(C=C(C(=C1O)O)O)C(=O)O", "Medicinal Activity": "Antioxidant", "Target Protein / Receptor Name": "Human Peroxiredoxin 5", "PDB ID": "1HD2", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "वयःस्थापनां धात्रीफलमम्लं रसे स्मृतम्। परं कफहरं वृष्यं चक्षुष्यं च रसायनम्॥", "Roman Transliteration": "vayaḥsthāpanāṃ dhātrīphalamamlaṃ rase smṛtam | paraṃ kaphaharaṃ vṛṣyaṃ cakṣuṣyaṃ ca rasāyanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Amla Madhura Tikta Kasaya Katu; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Rasayana Vayasthapana (Anti-aging) Chakshushya"},
-        {"Master ID": "M-012", "Herb / Tree Name": "Garlic", "Scientific Name": "Allium sativum", "Family": "Amaryllidaceae", "Phytochemical": "Allicin", "Canonical SMILES": "C=CCSS(=O)CC=C", "Medicinal Activity": "Antibacterial", "Target Protein / Receptor Name": "Staphylococcus aureus Sortase A", "PDB ID": "2GLA", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "लशुनः कटुकोष्णश्च तीक्ष्णो वातकफापहः। रसायनः परं हृद्यः क्रिमिकुष्ठविनाशनः॥", "Roman Transliteration": "laśunaḥ kaṭukoṣṇaśca tīkṣṇo vātakaphāpahaḥ | rasāyanaḥ paraṃ hṛdyaḥ krimikuṣṭhavināśanaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Madhura Tikta Kasaya; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Krimighna Hridya Rasayana Kusthahara"},
+        {"Master ID": "M-012", "Herb / Tree Name": "Garlic", "Scientific Name": "Allium sativum", "Family": "Amaryllidaceae", "Phytochemical": "Allicin", "Canonical SMILES": "C=CCSS(=O)CC=C", "Medicinal Activity": "Antibacterial", "Target Protein / Receptor Name": "Staphylococcus aureus Sortase A", "PDB ID": "2GLA", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "लशुनः कटुकोष्णश्च तीक्ष्णो वातकफापहः। रसायनः परं हृद्यःক্রिमिकुष्ठविनाशनः॥", "Roman Transliteration": "laśunaḥ kaṭukoṣṇaśca tīkṣṇo vātakaphāpahaḥ | rasāyanaḥ paraṃ hṛdyaḥ krimikuṣṭhavināśanaḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Madhura Tikta Kasaya; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Krimighna Hridya Rasayana Kusthahara"},
         {"Master ID": "M-013", "Herb / Tree Name": "Ginger", "Scientific Name": "Zingiber officinale", "Family": "Zingiberaceae", "Phytochemical": "6-Gingerol", "Canonical SMILES": "CCCCCC(CC(=O)CCC1=CC(=C(C=C1)O)OC)O", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "Cyclooxygenase-2 (COX-2)", "PDB ID": "1CX2", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "आर्द्रकं कटुकं दीपनं चोष्णं वातकफापहम्। शूलहृद्भेदनं हृद्यं विबन्धानाहनाशनम्॥", "Roman Transliteration": "ārdrakaṃ kaṭukaṃ dīpanaṃ coṣṇaṃ vātakaphāpaham | śūlahṛdbhedanaṃ hṛdyaṃ vibandhānāhanāśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Dipana (Digestive) Shoolahara Hridya"},
         {"Master ID": "M-014", "Herb / Tree Name": "Black Pepper", "Scientific Name": "Piper nigrum", "Family": "Piperaceae", "Phytochemical": "Piperine", "Canonical SMILES": "C1CCN(CC1)C(=O)/C=C/C=C/C2=CC3=C(C=C2)OCO3", "Medicinal Activity": "Bioenhancer", "Target Protein / Receptor Name": "P-Glycoprotein", "PDB ID": "6I6H", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "मरिचं कटुकं तीक्ष्णं दीपनं कफवातजित्। उष्णं प्रसेकि क्रिमिहृच्छ्वासशूलविनाशनम्॥", "Roman Transliteration": "maricaṃ kaṭukaṃ tīkṣṇaṃ dīpanṃ kaphavātajit | uṣṇaṃ praseki krimihṛcchvāsaśūlavināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramathi (Bioenhancer) Dipana Krimihara Shwasahara"},
         {"Master ID": "M-015", "Herb / Tree Name": "Shankhpushpi", "Scientific Name": "Convolvulus pluricaulis", "Family": "Convolvulaceae", "Phytochemical": "Scopoletin", "Canonical SMILES": "COC1=C(C=C2C(=C1)C=CC(=O)O2)O", "Medicinal Activity": "Anxiolytic", "Target Protein / Receptor Name": "GABA-A Receptor", "PDB ID": "6D1M", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "शङ्खपुष्पी सरा तिक्ता मेध्या मानसरोगहृत्। बल्या रसायनी चैव विस्मृतिभ्रमनाशिनी॥", "Roman Transliteration": "śaṅkhapuṣpī sarā tiktā medhyā mānasarogahṛt | balyā rasāyanī caiva vismṛtibramhanāśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta; Virya: Shita; Vipaka: Madhura", "Classical Karma (Action)": "Medhya Manasarogahara (Anxiolytic) Rasayana"},
@@ -2071,8 +2071,7 @@ else:
 
             orig_pose = split_docking_poses("docking_poses.pdbqt").get(st.session_state.get('selected_pose_export', 1), "") if os.path.exists("docking_poses.pdbqt") else ""
             orig_ints = compute_spatial_interactions("protein.pdbqt", orig_pose) if orig_pose else []
-            new_ints = compute_spatial_interactions("protein.pdbqt", p4_poses[p4_
-    new_ints = compute_spatial_interactions("protein.pdbqt", p4_poses[p4_sel_pose])
+            new_ints = compute_spatial_interactions("protein.pdbqt", p4_poses[p4_sel_pose])
             
             o_res = ", ".join(sorted(list(set([i["Residue Contact"] for i in orig_ints])))) if orig_ints else "None"
             n_res = ", ".join(sorted(list(set([i["Residue Contact"] for i in new_ints])))) if new_ints else "None"
