@@ -307,19 +307,67 @@ def convert_pdb_to_pdbqt(input_pdb, output_pdbqt="protein.pdbqt", is_ligand=Fals
         if os.path.exists(temp_out): os.remove(temp_out)
         return False, str(e)
 
+# --- 🚀 REBUILT: BULLETPROOF RDKIT 3D COORDINATE GENERATOR ---
 def convert_smiles_to_pdbqt(smiles_string, output_filename="ligand.pdbqt"):
     try:
         mol = Chem.MolFromSmiles(smiles_string)
-        if mol is None: return False, "Invalid SMILES."
+        if mol is None: return False, "Invalid SMILES matrix representation."
         mol = Chem.AddHs(mol)
-        params = AllChem.ETKDGv3()
-        params.useRandomCoords = True
-        params.maxIterations = 1000
-        res = AllChem.EmbedMolecule(mol, params)
-        if res != 0: res = AllChem.EmbedMolecule(mol, useRandomCoords=True)
-        if res != 0: return False, "RDKit failed to generate 3D coordinates."
-        try: AllChem.MMFFOptimizeMolecule(mol)
-        except: pass
+        
+        # Phase 4 Sandbox generates disconnected fragments (Parent.Fragment).
+        # We must split and embed these independently, otherwise ETKDGv3 fails due to undefined bounds.
+        frags = list(Chem.GetMolFrags(mol, asMols=True))
+        
+        if len(frags) > 1:
+            embedded_frags = []
+            for f in frags:
+                res = AllChem.EmbedMolecule(f, AllChem.ETKDGv3())
+                if res != 0:
+                    AllChem.EmbedMolecule(f, randomSeed=42, useRandomCoords=True, enforceChirality=False, ignoreSmoothingFailures=True)
+                try: AllChem.MMFFOptimizeMolecule(f)
+                except: pass
+                embedded_frags.append(f)
+                
+            combined_mol = embedded_frags[0]
+            for i in range(1, len(embedded_frags)):
+                combined_mol = Chem.CombineMols(combined_mol, embedded_frags[i])
+            mol = combined_mol
+            
+        else:
+            # Complex Monomers (like Azadirachtin)
+            params = AllChem.ETKDGv3()
+            params.randomSeed = 42
+            params.useRandomCoords = True
+            params.maxIterations = 2000
+            res = AllChem.EmbedMolecule(mol, params)
+            
+            # Fallback 1: Basic ETKDG
+            if res != 0:
+                params = AllChem.ETKDG()
+                params.randomSeed = 42
+                params.useRandomCoords = True
+                params.maxIterations = 2000
+                res = AllChem.EmbedMolecule(mol, params)
+                
+            # Fallback 2: Aggressive constraint relaxation (Drop Chirality bounds)
+            if res != 0:
+                params = AllChem.ETKDG()
+                params.enforceChirality = False
+                params.useRandomCoords = True
+                params.ignoreSmoothingFailures = True
+                params.maxIterations = 5000
+                res = AllChem.EmbedMolecule(mol, params)
+                
+            # Fallback 3: Pure Random Matrix Geometry
+            if res != 0:
+                res = AllChem.EmbedMolecule(mol, useRandomCoords=True, ignoreSmoothingFailures=True)
+                
+            if res != 0: 
+                return False, "RDKit failed to generate 3D coordinates even with relaxed physical constraints."
+                
+            try: AllChem.MMFFOptimizeMolecule(mol)
+            except: pass
+        
         temp_pdb = "temp_ligand.pdb"
         Chem.MolToPDBFile(mol, temp_pdb)
         ok, msg = convert_pdb_to_pdbqt(temp_pdb, output_filename, is_ligand=True)
@@ -327,8 +375,8 @@ def convert_smiles_to_pdbqt(smiles_string, output_filename="ligand.pdbqt"):
         return ok, msg
     except Exception as e: return False, str(e)
 
-# --- NATIVE UFF ENERGY MINIMIZATION ENGINE (MEMORY SAFE) ---
 
+# --- NATIVE UFF ENERGY MINIMIZATION ENGINE (MEMORY SAFE) ---
 def execute_uff_complex_minimization(protein_path, ligand_pose_str, progress_ui=None):
     try:
         protein_mol = Chem.MolFromPDBFile(protein_path, sanitize=False, removeHs=False)
@@ -521,6 +569,7 @@ def get_dynamic_fragments(parent_smiles):
             {"name": "Fluorination (-F)", "smiles": "F", "peak": 1150, "yield": "Poor Yield (38%)", "route": "Late-stage electrophilic fluorination using Selectfluor."}
         ]
 
+# --- 🚀 REBUILT: FAIL-SAFE CLEAVING ENGINE ---
 def run_cleaving_engine(parent_smiles, target_atom_idx, mechanism_mode):
     parent_mol = Chem.MolFromSmiles(parent_smiles)
     if not parent_mol: return []
@@ -542,7 +591,9 @@ def run_cleaving_engine(parent_smiles, target_atom_idx, mechanism_mode):
             try:
                 rw_mol = Chem.RWMol(parent_mol)
                 t_atom = rw_mol.GetAtomWithIdx(int(target_atom_idx))
-                if t_atom.GetDegree() == 1 and t_atom.GetSymbol() != 'C': t_atom.SetAtomicNum(0); t_atom.SetIsotope(999)
+                if t_atom.GetDegree() == 1 and t_atom.GetSymbol() != 'C': 
+                    t_atom.SetAtomicNum(0)
+                    t_atom.SetIsotope(999)
                 else:
                     dummy = Chem.Atom(0)
                     dummy.SetIsotope(999)
@@ -555,12 +606,18 @@ def run_cleaving_engine(parent_smiles, target_atom_idx, mechanism_mode):
                     final_mol = replaced_mols[0]
                     Chem.SanitizeMol(final_mol)
                     derived_smiles = Chem.MolToSmiles(final_mol)
-                    if Chem.MolFromSmiles(derived_smiles): success, frag_name, route = True, frag["name"], frag["route"]
-            except Exception: success = False
+                    if Chem.MolFromSmiles(derived_smiles): 
+                        success, frag_name, route = True, frag["name"], frag["route"]
+            except Exception: 
+                success = False
 
         test_mol = Chem.MolFromSmiles(derived_smiles)
-        mw = round(Descriptors.MolWt(test_mol), 2) if test_mol else 0
-        logp = round(Descriptors.MolLogP(test_mol), 2) if test_mol else 0
+        try:
+            mw = round(Descriptors.MolWt(test_mol), 2) if test_mol else 0.0
+            logp = round(Descriptors.MolLogP(test_mol), 2) if test_mol else 0.0
+        except Exception:
+            mw, logp = 0.0, 0.0
+            
         delta_score = round(baseline - (idx * 0.15) - (abs(logp) * 0.05), 2) if success else round(baseline + 0.5, 2)
         
         derived_library.append({
@@ -1128,7 +1185,7 @@ def load_ayurvedic_db():
         {"Master ID": "M-020", "Herb / Tree Name": "Karela (Bitter Melon)", "Scientific Name": "Momordica charantia", "Family": "Cucurbitaceae", "Phytochemical": "Charantin", "Canonical SMILES": "CC1CCC2(C(O1)C(C3C2(CCC4C3CCC5C4(CCC(C5)OC6C(C(C(C(O6)CO)O)O)O)C)C)O)C", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "Insulin Receptor Tyrosine Kinase", "PDB ID": "1IRK", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "कारवेल्लं कदु तीक्ष्णं तिक्तं पाके कटु स्मृतम्। दीपनं भेदनं हन्ति प्रमेहकफपित्तकृत्॥", "Roman Transliteration": "kāravellaṃ kadu tīkṣṇaṃ tiktaṃ pāke kaṭu smṛtam | dīpanāṃ bhedanāṃ hanti pramehakaphapittakṛt ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Tikta Katu; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Dipana Raktashodhaka"},
         {"Master ID": "M-021", "Herb / Tree Name": "Moringa", "Scientific Name": "Moringa oleifera", "Family": "Moringaceae", "Phytochemical": "Quercetin", "Canonical SMILES": "C1=CC(=C(C=C1C2=C(C(=O)C3=C(O2)C=C(C=C3O)O)O)O)O", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "PI3K", "PDB ID": "4FA6", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "शिग्रुस्तीक्ष्णोष्णकटुकः कफवातशोथहृत्। क्रिमिकुष्ठव्रणघ्नश्च दीपनो भेदनो लघुः॥", "Roman Transliteration": "śigrustīkṣṇoṣṇakaṭukaḥ kaphavātaśothahṛt | krimikuṣṭhavraṇaghnaśca dīpano bhedano laghuḥ ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Shothahara (Anti-inflammatory/Tumor) Krimighna Dipana"},
         {"Master ID": "M-022", "Herb / Tree Name": "Cinnamon", "Scientific Name": "Cinnamomum verum", "Family": "Lauraceae", "Phytochemical": "Cinnamaldehyde", "Canonical SMILES": "C1=CC=C(C=C1)/C=C/C=O", "Medicinal Activity": "Antidiabetic", "Target Protein / Receptor Name": "PPAR-gamma", "PDB ID": "3DZY", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "त्वक्पत्रं लघु तीक्ष्णोष्णं कडु तिक्तं च रुच्यकम्। कफवातहरं कण्ठरुक्प्रमेहविनाशनम्॥", "Roman Transliteration": "tvakpatraṃ laghu tīkṣṇoṣṇaṃ kaḍu tiktaṃ ca rucyakam | kaphavātaharaṃ kaṇṭharukpramehavināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Pramehahara (Antidiabetic) Dipana Hridya"},
-        {"Master ID": "M-023", "Herb / Tree Name": "Haritaki", "Scientific Name": "Terminalia chebula", "Family": "Combretaceae", "Phytochemical": "Chebulinic Acid", "Canonical SMILES": "CC1C2C(C(C(O1)OC(=O)C3=CC(=C(C(=C3)O)O)O)OC(=O)C4=CC(=C(C(=C4)O)O)O)OC(=O)C5=CC(=C(C(=C5)O)O)O", "Medicinal Activity": "Antiviral", "Target Protein / Receptor Name": "Hepatitis C Virus NS3/4A Protease", "PDB ID": "4A92", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "हरीतकी मानुषीणां मातेव हितकारिणी। प्रमेहकुष्ठशोथार्शःकामलाक्रिमिनाशिनी॥", "Roman Transliteration": "harītakī mānuṣīṇāṃ māteva hitakāriṇī | pramehakuṣṭhaśothārśaḥkāmalākrimināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya Madhura Amla Katu Tikta; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Tridosahara Anulomana (Laxative) Krimighna"},
+        {"Master ID": "M-023", "Herb / Tree Name": "Haritaki", "Scientific Name": "Terminalia chebula", "Family": "Combretaceae", "Phytochemical": "Chebulinic Acid", "Canonical SMILES": "CC1C2C(C(C(O1)OC(=O)C3=CC(=C(C(=C3)O)O)OC(=O)C4=CC(=C(C(=C4)O)O)O)OC(=O)C5=CC(=C(C(=C5)O)O)O", "Medicinal Activity": "Antiviral", "Target Protein / Receptor Name": "Hepatitis C Virus NS3/4A Protease", "PDB ID": "4A92", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "हरीतकी मानुषीणां मातेव हितकारिणी। प्रमेहकुष्ठशोथार्शःकामलाक्रिमिनाशिनी॥", "Roman Transliteration": "harītakī mānuṣīṇāṃ māteva hitakāriṇī | pramehakuṣṭhaśothārśaḥkāmalākrimināśinī ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya Madhura Amla Katu Tikta; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Tridosahara Anulomana (Laxative) Krimighna"},
         {"Master ID": "M-024", "Herb / Tree Name": "Baheda", "Scientific Name": "Terminalia bellirica", "Family": "Combretaceae", "Phytochemical": "Bellericanin", "Canonical SMILES": "C1=CC(=C(C=C1)O)C2=CC(=O)C3=C(O2)C=C(C(=C3O)O)O", "Medicinal Activity": "Antimicrobial", "Target Protein / Receptor Name": "Staphylococcus aureus Dihydrofolate Reductase", "PDB ID": "2W9S", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "बिभीतकं स्वादुपाकं कषायं कफपित्तनुत्। उष्णवीर्यं चक्षुष्यं केश्यं क्रिमिनाशनम्॥", "Roman Transliteration": "bibhītakaṃ svādupākaṃ kaṣāyaṃ kaphapittanut | uṣṇavīryaṃ cakṣuṣyaṃ keśyaṃ krimināśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya; Virya: Usna; Vipaka: Madhura", "Classical Karma (Action)": "Krimighna Kanthya (Throat-soothing) Chakshushya"},
         {"Master ID": "M-025", "Herb / Tree Name": "Bel", "Scientific Name": "Aegle marmelos", "Family": "Rutaceae", "Phytochemical": "Marmin", "Canonical SMILES": "CC(=CCOCCC1=CC=C2C(=C1)C=CC(=O)O2)C", "Medicinal Activity": "Gastroprotective", "Target Protein / Receptor Name": "H+/K+-ATPase (Proton Pump)", "PDB ID": "5YLV", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "बिल्वं कषायं मधुरं पाचकं दीपनं लघु। उष्णं कफवातहरं ग्राही विबन्धाध्माननाशनम्॥", "Roman Transliteration": "bilvaṃ kaṣāyaṃ madhuraṃ pācakaṃ dīpanaṃ laghu | uṣṇaṃ kaphavātaharaṃ grāhī vibandhādhmānanaśanam ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Kasaya Tikta Madhura; Virya: Usna; Vipaka: Katu", "Classical Karma (Action)": "Grahi (Gastroprotective) Dipana Pachana"},
         {"Master ID": "M-026", "Herb / Tree Name": "Pippali", "Scientific Name": "Piper longum", "Family": "Piperaceae", "Phytochemical": "Piperlongumine", "Canonical SMILES": "C1CC(=O)NC(=O)C1/C=C/C2=CC(=C(C(=C2)OC)OC)OC", "Medicinal Activity": "Anticancer", "Target Protein / Receptor Name": "Human Glutathione S-Transferase P1", "PDB ID": "11GS", "Sanskrit Shloka (Bhavaprakasha Nighantu)": "पिप्पली कटुका तिक्ता स्वादुपाका रसायनी। दीपनी श्वासकासघ्नी प्रमेहार्शःक्षयापहा॥", "Roman Transliteration": "pippalī kaṭukā tiktā svādupākā rasāyanī | dīpanī śvāsakāsaghnī pramehārśaḥkṣayāpahā ||", "Dravyaguna Profile (Rasa/Virya/Vipaka)": "Rasa: Katu; Virya: Anushnasheeta; Vipaka: Madhura", "Classical Karma (Action)": "Rasayana Dipana Shwasahara Kasanut"},
@@ -1219,7 +1276,6 @@ with col_params:
     )
 
     if st.button("📥 Auto-Fill & Load DravyaDock Pipeline", type="primary"):
-        # Match back to the specific row
         idx = filtered_df.apply(lambda row: f"{row['Herb / Tree Name']} - {row['Phytochemical']} vs {row['Target Protein / Receptor Name']} ({row['PDB ID']})", axis=1) == selected_entry_str
         target_row = filtered_df[idx].iloc[0]
 
@@ -1249,7 +1305,6 @@ with col_params:
                 st.session_state.smiles_cache = smiles
                 with open("ligand.pdbqt", "r") as f: st.session_state.serialized_ligand_block = f.read()
                 
-                # Append Traditional Ayurvedic Data to the summary text
                 st.session_state.ligand_summary_text = (
                     f"**Phytochemical Identifier:** {target_row['Phytochemical']} | **Formula:** {pub_data['formula']} | **MW:** {pub_data['mw']}\n\n"
                     f"> **Dravyaguna Matrix (Ayurvedic Profile):**\n"
@@ -1509,7 +1564,6 @@ with col_visual:
             render_advanced_modeling_blueprint(receptor_view_data, st.session_state.serialized_ligand_block, mode="cartoon", unique_id="v_phase1")
             
         with view_tabs[1]:
-            # 🛠 Clean standalone 3D rendering to eliminate 2D generation bugs entirely
             if st.session_state.ligand_ready and st.session_state.serialized_ligand_block:
                 st.markdown("### 🔬 Isolated Drug Topology")
                 st.markdown("Use your mouse to rotate and scroll to zoom in on the specific bonds and stereochemistry of your loaded small molecule.")
@@ -2017,7 +2071,8 @@ else:
 
             orig_pose = split_docking_poses("docking_poses.pdbqt").get(st.session_state.get('selected_pose_export', 1), "") if os.path.exists("docking_poses.pdbqt") else ""
             orig_ints = compute_spatial_interactions("protein.pdbqt", orig_pose) if orig_pose else []
-            new_ints = compute_spatial_interactions("protein.pdbqt", p4_poses[p4_sel_pose])
+            new_ints = compute_spatial_interactions("protein.pdbqt", p4_poses[p4_
+    new_ints = compute_spatial_interactions("protein.pdbqt", p4_poses[p4_sel_pose])
             
             o_res = ", ".join(sorted(list(set([i["Residue Contact"] for i in orig_ints])))) if orig_ints else "None"
             n_res = ", ".join(sorted(list(set([i["Residue Contact"] for i in new_ints])))) if new_ints else "None"
