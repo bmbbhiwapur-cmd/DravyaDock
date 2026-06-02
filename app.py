@@ -1223,7 +1223,7 @@ def load_ayurvedic_db():
 st.set_page_config(page_title="DravyaDock Hub", layout="wide")
 st.title("🌿 DravyaDock (द्रव्यDock) - Computational Ayurvedic Molecular Docking Platform")
 st.markdown("**DravyaDock bridges traditional Ayurvedic pharmacology (Dravyaguna Vidya) from the Bhavaprakasha Nighantu with modern translational structural bioinformatics and structure-based drug discovery pipelines.**")
-st.markdown("**Developed by: Dr. Sarang S. Dhote, Assistant Professor, Department of Chemistry, Shivaji Science College, Nagpur, India **")
+st.markdown("**Developed by: Dr. Sarang S. Dhote, Assistant Professor, Department of Chemistry, Shivaji Science College, Nagpur, India | Tech Logic Core Systems (TLCS)**")
 
 # Master Reset
 if st.button("🔄 Reset Entire Environment", type="secondary", use_container_width=True):
@@ -1595,28 +1595,9 @@ with col_visual:
                 
                 try:
                     aff_val = float(pose_affinity_score)
-                    
-                    # BIOPHYSICAL CIRCUIT BREAKER
-                    if aff_val > 0:
-                        aff_color = "#c62828"  # Red for positive energy (no binding)
-                    elif aff_val <= -20.0:
-                        aff_color = "#d84315"  # Orange/Red alert for impossible score
-                        st.error(f"🚨 **Structural Anomaly Detected! (Score: {aff_val} kcal/mol)**")
-                        st.warning(
-                            "This binding affinity is astronomically high and physically unrealistic for non-covalent interactions. "
-                            "**Cause:** This is a mathematical artifact, usually caused by forcing a massive ligand into a tiny, rigid grid box, "
-                            "resulting in extreme atomic overlapping.\n\n"
-                            "**Fix:** Please check your ligand's size or increase your Grid Box dimensions (X, Y, Z)."
-                        )
-                    else:
-                        aff_color = "#1b5e20"  # Green for normal, realistic biological binding limits
-
+                    aff_color = "#c62828" if aff_val > 0 else "#1b5e20"
                 except ValueError:
                     aff_color = "#1b5e20"
-
-                # SMART CACHE WITH DEDICATED PROGRESS UI
-                cache_key = f"uff_{st.session_state.protein_name}_{selected_pose}"
-                uff_progress_placeholder = st.empty() # Create dynamic UI slot
 
                 cache_key = f"uff_{st.session_state.protein_name}_{selected_pose}"
                 uff_progress_placeholder = st.empty() 
