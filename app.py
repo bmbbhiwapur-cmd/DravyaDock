@@ -1223,7 +1223,7 @@ def load_ayurvedic_db():
 st.set_page_config(page_title="DravyaDock Hub", layout="wide")
 st.title("🌿 DravyaDock (द्रव्यDock) - Computational Ayurvedic Molecular Docking Platform")
 st.markdown("**DravyaDock bridges traditional Ayurvedic pharmacology (Dravyaguna Vidya) from the Bhavaprakasha Nighantu with modern translational structural bioinformatics and structure-based drug discovery pipelines.**")
-st.markdown("**Developed by: Dr. Sarang S. Dhote, Assistant Professor, Department of Chemistry, Shivaji Science College, Nagpur, India | Tech Logic Core Systems (TLCS)**")
+st.markdown("**Developed by: Dr. Sarang S. Dhote, Assistant Professor, Department of Chemistry, Shivaji Science College, Nagpur, India **")
 
 # Master Reset
 if st.button("🔄 Reset Entire Environment", type="secondary", use_container_width=True):
