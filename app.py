@@ -59,6 +59,17 @@ except Exception:
 
 RDLogger.DisableLog("rdApp.*")
 
+import inspect
+# use_container_width is deprecated; newer Streamlit wants width="stretch"
+try:
+    STRETCH = {"width": "stretch"} if "width" in inspect.signature(st.button).parameters else {"use_container_width": True}
+except Exception:
+    STRETCH = {"use_container_width": True}
+
+# UFF is built only on protein atoms within this radius (A) of the ligand pose.
+# Whole-protein UFF is O(N^2) in memory/time and can kill a small host.
+UFF_POCKET_RADIUS = 12.0
+
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # =====================================================================
@@ -515,7 +526,23 @@ def convert_smiles_to_pdbqt(smiles_string, output_filename="ligand.pdbqt"):
 
 def execute_uff_complex_minimization(protein_path, ligand_pose_str, progress_ui=None):
     try:
-        protein_mol = Chem.MolFromPDBFile(protein_path, sanitize=False, removeHs=False)
+        lig_atoms = parse_pdbqt_coordinates(ligand_pose_str)
+        if not lig_atoms:
+            return "N/A", "N/A", "N/A"
+        lig_xyz = np.array([a["coord"] for a in lig_atoms])
+        pocket_lines = []
+        with open(protein_path, "r") as pf:
+            for pline in pf:
+                if pline.startswith(("ATOM", "HETATM")):
+                    try:
+                        pxyz = np.array([float(pline[30:38]), float(pline[38:46]), float(pline[46:54])])
+                    except ValueError:
+                        continue
+                    if np.min(np.linalg.norm(lig_xyz - pxyz, axis=1)) <= UFF_POCKET_RADIUS:
+                        pocket_lines.append(pline)
+        if not pocket_lines:
+            return "N/A", "N/A", "N/A"
+        protein_mol = Chem.MolFromPDBBlock("".join(pocket_lines), sanitize=False, removeHs=False)
         ligand_mol = Chem.MolFromPDBBlock(ligand_pose_str, sanitize=False, removeHs=False)
         if not protein_mol or not ligand_mol:
             return "N/A", "N/A", "N/A"
@@ -575,30 +602,40 @@ def parse_pdbqt_coordinates(pdbqt_string):
                 continue
     return atoms
 
+@st.cache_data(show_spinner=False, max_entries=8)
+def _load_receptor_arrays(path, mtime):
+    """Parse the receptor once per file version (was re-parsed for every pose, every rerun)."""
+    with open(path, "r") as f:
+        atoms = parse_pdbqt_coordinates(f.read())
+    xyz = np.array([a["coord"] for a in atoms]) if atoms else np.zeros((0, 3))
+    return xyz, [a["element"] for a in atoms], [a["res"] for a in atoms]
+
 def compute_spatial_interactions(receptor_file, ligand_pdbqt_str):
+    """Vectorised: one numpy distance row per ligand atom instead of L x R Python iterations."""
     interactions = []
     if not os.path.exists(receptor_file):
         return interactions
-    with open(receptor_file, "r") as f:
-        receptor_atoms = parse_pdbqt_coordinates(f.read())
+    r_xyz, r_el, r_res = _load_receptor_arrays(receptor_file, os.path.getmtime(receptor_file))
     ligand_atoms = parse_pdbqt_coordinates(ligand_pdbqt_str)
+    if len(r_xyz) == 0 or not ligand_atoms:
+        return interactions
 
     seen = set()
     for l_at in ligand_atoms:
-        for r_at in receptor_atoms:
-            dist = np.linalg.norm(l_at["coord"] - r_at["coord"])
-            if dist < 3.8:
-                res_id = r_at["res"]
-                if res_id in seen:
-                    continue
-                if l_at["element"] in ["N", "O", "F", "S"] and r_at["element"] in ["N", "O", "F", "S"]:
-                    b_type = "Hydrogen Bond"
-                elif "A" in r_at["element"] or (l_at["element"] == "C" and r_at["element"] == "C" and any(aro in r_at["res"] for aro in ["PHE", "TYR", "TRP"])):
-                    b_type = "pi-Stacking / Hydrophobic"
-                else:
-                    b_type = "van der Waals Contact"
-                seen.add(res_id)
-                interactions.append({"Residue Contact": res_id, "Interaction Type": b_type, "Distance (Å)": round(float(dist), 2), "r_coord": r_at["coord"].tolist(), "l_coord": l_at["coord"].tolist()})
+        d = np.linalg.norm(r_xyz - l_at["coord"], axis=1)
+        for j in np.nonzero(d < 3.8)[0]:
+            res_id = r_res[j]
+            if res_id in seen:
+                continue
+            r_elem = r_el[j]
+            if l_at["element"] in ["N", "O", "F", "S"] and r_elem in ["N", "O", "F", "S"]:
+                b_type = "Hydrogen Bond"
+            elif "A" in r_elem or (l_at["element"] == "C" and r_elem == "C" and any(aro in res_id for aro in ["PHE", "TYR", "TRP"])):
+                b_type = "pi-Stacking / Hydrophobic"
+            else:
+                b_type = "van der Waals Contact"
+            seen.add(res_id)
+            interactions.append({"Residue Contact": res_id, "Interaction Type": b_type, "Distance (Å)": round(float(d[j]), 2), "r_coord": r_xyz[j].tolist(), "l_coord": l_at["coord"].tolist()})
     return interactions
 
 def split_docking_poses(poses_file_path):
@@ -631,7 +668,17 @@ def get_pose_affinity(stdout_text, idx):
             return m.group(2)
     return "N/A"
 
+@st.cache_data(show_spinner=False, max_entries=16)
+def _parse_vina_cached(stdout_text, docking_file, d_mtime, p_mtime):
+    return _parse_vina_impl(stdout_text, docking_file)
+
 def parse_vina_output_with_residues_global(stdout_text, docking_file="docking_poses.pdbqt"):
+    """Cached: the pose/interaction table used to be rebuilt 2-3 times on every rerun."""
+    dm = os.path.getmtime(docking_file) if os.path.exists(docking_file) else 0
+    pm = os.path.getmtime("protein.pdbqt") if os.path.exists("protein.pdbqt") else 0
+    return _parse_vina_cached(stdout_text or "", docking_file, dm, pm)
+
+def _parse_vina_impl(stdout_text, docking_file="docking_poses.pdbqt"):
     data = []
     poses_dict = split_docking_poses(docking_file)
     if not stdout_text:
@@ -906,7 +953,17 @@ def render_advanced_modeling_blueprint(receptor_data, ligand_data, mode="cartoon
         document.addEventListener('fullscreenchange', () => {{ if (!document.fullscreenElement) document.getElementById("{unique_id}").style.height = "480px"; }});
     </script>
     """
-    components.html(html_content, height=510)
+    show_html(html_content, 510)
+
+def show_html(html_str, height):
+    """components.html is deprecated/removed in new Streamlit; prefer st.iframe when present."""
+    if hasattr(st, "iframe"):
+        try:
+            st.iframe(html_str.strip(), height=height)
+            return
+        except Exception:
+            pass
+    components.html(html_str, height=height)
 
 def _style_js(viewer, mode):
     if mode == 'spacefill':
@@ -1242,7 +1299,7 @@ This is the total stress of the complex *after* the Universal Force Field (UFF) 
 st.title("🔬 InSilico BioSphere - Unified Drug Design Engine")
 st.markdown("**Developed by: Dr. Sarang S. Dhote, Assistant Professor, Department of Chemistry, Shivaji Science College, Nagpur, India | Tech Logic Core Systems (TLCS)**")
 
-if st.button("🔄 Reset Entire Environment", type="secondary", use_container_width=True):
+if st.button("🔄 Reset Entire Environment", type="secondary", **STRETCH):
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     for f in ["protein.pdbqt", "ligand.pdbqt", "docking_poses.pdbqt", "temp_lig_state.pdb", "redesign_ligand.pdbqt", "redesign_docking_poses.pdbqt"]:
@@ -1536,7 +1593,7 @@ with col_params:
     # --- CAVITY & BOUND SITE FINDER ---
     st.subheader("3. Smart Cavity & Bound Site Finder")
     if st.session_state.target_ready and os.path.exists("protein.pdbqt"):
-        if st.button("🔍 Scan Surface For Structural Cavities", use_container_width=True):
+        if st.button("🔍 Scan Surface For Structural Cavities", **STRETCH):
             with st.spinner("Analyzing macromolecular spatial curvature dynamics..."):
                 pockets = identify_protein_cavities("protein.pdbqt")
                 st.session_state.detected_pockets = pockets
@@ -1568,7 +1625,7 @@ with col_params:
 
     st.subheader("4. Search Space Mechanics (Grid Box)")
 
-    if st.button("🌐 Enable Blind Docking (Full Protein Surface)", use_container_width=True):
+    if st.button("🌐 Enable Blind Docking (Full Protein Surface)", **STRETCH):
         if st.session_state.target_ready and os.path.exists("protein.pdbqt"):
             bcx, bcy, bcz, bsx, bsy, bsz = compute_protein_bounding_box("protein.pdbqt")
             st.session_state.cx, st.session_state.cy, st.session_state.cz = round(float(bcx), 1), round(float(bcy), 1), round(float(bcz), 1)
@@ -1717,7 +1774,7 @@ with col_visual:
                 st.markdown("#### 🧬 Local Contact Residues & Bond Assignments Matrix")
                 if active_interactions:
                     df_int = pd.DataFrame(active_interactions)
-                    st.dataframe(df_int[["Residue Contact", "Interaction Type", "Distance (Å)"]], hide_index=True, use_container_width=True)
+                    st.dataframe(df_int[["Residue Contact", "Interaction Type", "Distance (Å)"]], hide_index=True, **STRETCH)
                 else:
                     st.info("No close contacts detected within a 3.8 Å threshold radius.")
 
@@ -1795,7 +1852,7 @@ Dr. Sarang S. Dhote, "InSilico BioSphere: An Integrated Platform for Automated M
                     uff_theory_html=report_uff_theory_html, orig_matrix_html=orig_matrix_html,
                     grid_strategy=st.session_state.selected_native_ligand, ayur_row=st.session_state.ayur_row
                 )
-                st.download_button(label="📥 Download Phase 1 HTML Research Report", data=p1_html_report, file_name=f"InSilico_Phase1_Report_{st.session_state.pdb_id_display}.html", mime="text/html", use_container_width=True, key="dl_phase1")
+                st.download_button(label="📥 Download Phase 1 HTML Research Report", data=p1_html_report, file_name=f"InSilico_Phase1_Report_{st.session_state.pdb_id_display}.html", mime="text/html", **STRETCH, key="dl_phase1")
 
 # --- ENGINE EXECUTION ---
 if run_btn and can_dock:
@@ -1855,10 +1912,10 @@ if st.session_state.docking_results_raw is not None:
     if not df_results.empty:
         col_table, col_export = st.columns([2, 1])
         with col_table:
-            st.dataframe(df_results, hide_index=True, use_container_width=True)
+            st.dataframe(df_results, hide_index=True, **STRETCH)
         with col_export:
             csv_data = df_results.to_csv(index=False).encode('utf-8')
-            st.download_button(label="📥 Download Data Sheet (.CSV)", data=csv_data, file_name="screening_affinity_report.csv", mime="text/csv", use_container_width=True)
+            st.download_button(label="📥 Download Data Sheet (.CSV)", data=csv_data, file_name="screening_affinity_report.csv", mime="text/csv", **STRETCH)
 
 # ---------------------------------------------------------------------
 # PHASE 2
@@ -1918,7 +1975,7 @@ else:
 
         if st.session_state.rd_library is not None and not st.session_state.rd_library.empty:
             st.subheader("Synthesized Structural Variant Optimization Array Data Track")
-            st.dataframe(st.session_state.rd_library[["Variant ID", "Fragment Added", "Redesigned SMILES", "Delta Score", "MW (g/mol)", "LogP"]], hide_index=True, use_container_width=True)
+            st.dataframe(st.session_state.rd_library[["Variant ID", "Fragment Added", "Redesigned SMILES", "Delta Score", "MW (g/mol)", "LogP"]], hide_index=True, **STRETCH)
 
 # ---------------------------------------------------------------------
 # PHASE 3
@@ -1991,7 +2048,7 @@ else:
                     _f(adme_v['LogP'], ".2f"), adme_v['pKa_Acid'], adme_v['pKa_Base'], _f(adme_v['MP'], ".1f")
                 ]
             })
-            st.dataframe(comp_df, hide_index=True, use_container_width=True)
+            st.dataframe(comp_df, hide_index=True, **STRETCH)
 
             try:
                 vol_shift = adme_v['Volume'] - adme_p['Volume']
@@ -2167,7 +2224,7 @@ else:
                 "Optimized Derivative": [f"{new_aff_str} kcal/mol", f"{delta_uff} kcal/mol", n_res, n_bonds]
             }
             df_comp = pd.DataFrame(comp_data)
-            st.dataframe(df_comp, hide_index=True, use_container_width=True)
+            st.dataframe(df_comp, hide_index=True, **STRETCH)
 
             try:
                 delta_aff = round(float(new_aff_str) - float(orig_aff), 2) if orig_aff else 0.0
@@ -2302,7 +2359,7 @@ Dr. Sarang S. Dhote, "InSilico BioSphere: An Integrated Platform for Automated M
                 orig_matrix_html=orig_matrix_html, new_matrix_html=new_matrix_html, grid_strategy=st.session_state.selected_native_ligand,
                 ayur_row=st.session_state.ayur_row
             )
-            st.download_button(label="📥 Download Consolidated Manuscript Quality HTML Research Report", data=html_report, file_name=f"InSilico_BioSphere_Research_Record_{v_row['Variant ID']}.html", mime="text/html", use_container_width=True, key="dl_phase4")
+            st.download_button(label="📥 Download Consolidated Manuscript Quality HTML Research Report", data=html_report, file_name=f"InSilico_BioSphere_Research_Record_{v_row['Variant ID']}.html", mime="text/html", **STRETCH, key="dl_phase4")
 
 if trigger_rerun:
     safe_rerun()
